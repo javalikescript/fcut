@@ -1,0 +1,33 @@
+html {
+  height: 100%;
+}
+body {
+  margin: 0;
+  height: 100%;
+  display: block;
+  overflow: hidden;
+}
+section.page {
+  position: absolute;
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  transition: all 0.25s ease;
+  background-color: inherit;
+}
+section.page.hideLeft {
+  transform: translateX(-100%);
+}
+section.page.hideRight {
+  transform: translateX(100%);
+}
+section.page.hideTop {
+  transform: translateY(-100%);
+}
+section.page.hideBottom {
+  transform: translateY(100%);
+}
+section.page.hide {
+  opacity: 0;
+  z-index: -1000;
+}

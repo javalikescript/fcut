@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html><head lang="en">
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta charset="UTF-8">
+  <title>Fast Cut (Preview)</title>
+  <link rel="stylesheet" href="fcut.css">
+  <link rel="stylesheet" href="page.css">
+  <link rel="stylesheet" href="FileChooser.css">
+  <link href="assets/fontawesome/css/all.css" rel="stylesheet" />
+  <script src="assets/promise.min.js" type="text/javascript"></script>
+  <script src="assets/fetch.umd.js" type="text/javascript"></script>
+  <script src="assets/vue.min.js" type="text/javascript"></script>
+  <script src="page.js" type="text/javascript"></script>
+  <script src="FileChooser.js" type="text/javascript"></script>
+</head><body>
+  <div id="app">
+    <page name="file-chooser">
+      <file-chooser-dialog v-on:selected="onFileChoosed" fetch="true" ref="fileChooser" />
+    </page>
+    <page name="home">
+      <div class="padded">
+        <div class="bar-flex-row">
+          <span class="bar-flex-row-content"></span>
+          <button v-on:click="pages.navigateTo('options')"><i class="fas fa-cog"></i></button>
+        </div>
+        <h2>Fast / Lossless FFmpeg Cutter (Preview)</h2>
+        <div class="flow">
+          <button v-on:click="addSources().then(function() { pages.navigateTo('preview'); })" class="home"><i class="far fa-file-video"></i> Select videos</button>
+          <i class="fas fa-chevron-right"></i>
+          <button v-on:click="pages.navigateTo('preview')" class="home"><i class="fas fa-film"></i> Cut</button>
+          <i class="fas fa-chevron-right"></i>
+          <button v-on:click="pages.navigateTo('export')" class="home"><i class="fas fa-cogs"></i> Export</button>
+        </div>
+      </div>
+    </page>
+    <page name="preview">
+      <img class="preview" :src="previewSrc" v-on:click="navigateOnPreviewClick" v-bind:style="{ 'aspect-ratio': aspectRatio }" />
+      <div class="overlay bar-flex-row">
+        <button v-on:click="pages.navigateBack()"><i class="fas fa-arrow-left"></i></button>
+        <span class="bar-flex-row-content"></span>
+        <button v-on:click="bars.nav = !bars.nav;" v-bind:class="{pressed: bars.nav}" title="Show navigation bar"><i class="fas fa-stream"></i></button>
+        <button v-on:click="bars.time = !bars.time;" v-bind:class="{pressed: bars.time}" title="Show time bar"><i class="fas fa-forward"></i></button>
+        <button v-on:click="bars.cut = !bars.cut;" v-bind:class="{pressed: bars.cut}" title="Show cut bar"><i class="fas fa-cut"></i></button>
+        <button v-on:click="bars.bsearch = !bars.bsearch;" v-bind:class="{pressed: bars.bsearch}" title="Show binary search bar"><i class="fas fa-search"></i></button>
+        <span class="bar-flex-row-content"></span>
+      </div>
+      <div id="navigation-bar" v-if="bars.nav" v-on:click="navigateOnClick($event, 'navigation-bar')" style="cursor: pointer; padding-left: 1%;">
+        <span v-for="(part, index) in parts" v-bind:class="{ 'part-time': partIndex === index, 'part-even': index % 2 === 0, 'part-odd': index % 2 === 1 }"
+          v-bind:style="{ width: (Math.floor((part ? part.duration : 0) * 980 / duration) / 10) + '%' }"></span>
+        <span v-bind:style="{ left: (Math.floor(time * 980 / duration) / 10 + 1) + '%' }" class="position"></span>
+      </div>
+      <div v-if="bars.time" class="button-bar" title="Preview time">
+        <a href="#" v-on:click="navigateTo(0)" class="time" title="Go to start">0:00</a>
+        <button v-on:click="move(-period)" title="Move backard one period"><i class="fas fa-backward"></i></button>
+        <button v-on:click="move(-60)" title="Move backard one minute"><i class="fas fa-fast-backward"></i></button>
+        <button v-on:click="move(-1)" title="Move backard one second"><i class="fas fa-step-backward"></i></button>
+        <input type="text" v-model="timeHMS" class="time" title="Preview time" />
+        <button v-on:click="move(1)" title="Move forward one second"><i class="fas fa-step-forward"></i></button>
+        <button v-on:click="move(60)" title="Move forward one minute"><i class="fas fa-fast-forward"></i></button>
+        <button v-on:click="move(period)" title="Move forward one period"><i class="fas fa-forward"></i></button>
+        <a href="#" v-on:click="navigateTo(duration)" class="time" title="Go to end">{{ formatHMS(duration) }}</a>
+      </div>
+      <div v-if="bars.cut" class="button-bar" title="Video edition">
+        <button v-on:click="addSources(partIndex)" title="Add sources before the preview part"><i class="fas fa-plus"></i> Insert...</button>
+        <button v-on:click="split()" title="Cut the part in 2 at preview time"><i class="fas fa-cut"></i> Split</button>
+        <button v-on:click="movePart(partIndex, partIndex - 1)" v-bind:disabled="partIndex === 0" title="Move the part backward"><i class="fas fa-arrow-left"></i></button>
+        <button v-on:click="movePart(partIndex, partIndex + 1)" v-bind:disabled="partIndex === parts.length - 1" title="Move the part forward"><i class="fas fa-arrow-right"></i></button>
+        <button v-on:click="removePart(partIndex)" title="Discard the preview part"><i class="fas fa-trash"></i> Remove</button>
+        <button v-on:click="pages.navigateTo('export')"><i class="fas fa-cogs"></i> Export...</button>
+      </div>
+      <div v-if="bars.bsearch" class="button-bar" title="Binary search">
+        <input type="text" v-model="periodHMS" class="time" title="Period" />
+        <button v-on:click="findNext(false)" title="Move backard"><i class="fas fa-angle-double-left"></i> Back</button>
+        <button v-on:click="findNext(true)" title="Move forward"><i class="fas fa-angle-double-right"></i> Next</button>
+        <div class="time" title="Search period" style="display: inline-block;">
+          <i v-if="findPeriod === 0" class="fas fa-check"></i>
+          {{ ((findPeriod !== period) && (findPeriod > 0)) ? formatHMS(findPeriod) : '&nbsp;' }}
+        </div>
+      </div>
+      <div v-if="bars.part" class="button-bar" title="Parts edition">
+      </div>
+    </page>
+    <page name="export">
+      <div class="padded">
+        <button v-on:click="pages.navigateBack()"><i class="fas fa-arrow-left"></i></button>
+        <h2>Export</h2>
+        <div class="bar-flex-row">
+          <input v-model="destinationFilename" name="filename" type="text" class="bar-flex-row-content"></input>
+          <button v-on:click="selectFiles(false, true).then(function(filename) { destinationFilename = filename; })"><i class="fas fa-file"></i></button>
+        </div>
+        <div class="button-bar">
+          <button v-bind:disabled="exporting || parts.length === 0" v-on:click="exportVideo()"><i class="fas fa-cog"></i> Export</button>
+          <button v-bind:disabled="!exporting" v-on:click="pages.navigateTo('console')"><i class="fas fa-terminal"></i></button>
+        </div>
+      </div>
+    </page>
+    <page name="console">
+      <div class="bar-flex-row">
+        <button v-on:click="pages.navigateBack()"><i class="fas fa-arrow-left"></i></button>
+      </div>
+      <div class="console">
+        <pre v-for="buffer in buffers">{{ buffer }}</pre>
+      </div>
+    </page>
+    <page name="options">
+      <div class="padded">
+        <div class="bar-flex-row">
+          <button v-on:click="pages.navigateBack()"><i class="fas fa-arrow-left"></i></button>
+          <span class="bar-flex-row-content"></span>
+          <button v-on:click="pages.navigateTo('about')"><i class="fas fa-question"></i></button>
+        </div>
+        <h2>Options</h2>
+      </div>
+    </page>
+    <page name="about">
+      <div class="padded">
+        <button v-on:click="pages.navigateBack()"><i class="fas fa-arrow-left"></i></button>
+        <h2>About</h2>
+        <p>This application uses the following external software/libraries</p>
+        <ul>
+          <li><a href="https://github.com/github/fetch/releases">fetch</a> is licensed under the MIT license</li>
+          <li><a href="https://vuejs.org/">Vue.js</a> is licensed under the MIT license</li>
+          <li><a href="https://github.com/taylorhakes/promise-polyfill">promise</a> is licensed under the MIT license</li>
+          <li><a href="https://fontawesome.com/license/free">Font Awesome</a> is licensed under MIT, SIL OFL, and CC BY licenses</li>
+          <li><a href="https://www.ffmpeg.org/">FFmpeg</a> is licensed under the GNU Lesser General Public License (LGPL) version 2.1 or later</li>
+          <li><a href="https://github.com/luvit/luv">luv</a> is licensed under the Apache License Version 2.0</li>
+          <li><a href="https://www.lua.org/home.html">Lua</a> is licensed under the MIT license</li>
+        </ul>
+      </div>
+    </page>
+  </div>
+  <script src="fcut.js" type="text/javascript"></script>
+</body></html>
