@@ -15,7 +15,7 @@
 </head><body>
   <div id="app">
     <page name="file-chooser">
-      <file-chooser-dialog v-on:selected="onFileChoosed" fetch="true" ref="fileChooser" />
+      <file-chooser-dialog v-on:selected="onFileChoosed" fetch="true" ref="fileChooser"></file-chooser-dialog>
     </page>
     <page name="home">
       <div class="padded">
@@ -34,17 +34,20 @@
       </div>
     </page>
     <page name="preview">
-      <img class="preview" :src="previewSrc" v-on:click="navigateOnPreviewClick" v-bind:style="{ 'aspect-ratio': aspectRatio }" />
-      <div class="overlay bar-flex-row">
-        <button v-on:click="pages.navigateBack()"><i class="fas fa-arrow-left"></i></button>
-        <span class="bar-flex-row-content"></span>
-        <button v-on:click="bars.nav = !bars.nav;" v-bind:class="{pressed: bars.nav}" title="Show navigation bar"><i class="fas fa-stream"></i></button>
-        <button v-on:click="bars.time = !bars.time;" v-bind:class="{pressed: bars.time}" title="Show time bar"><i class="fas fa-forward"></i></button>
-        <button v-on:click="bars.cut = !bars.cut;" v-bind:class="{pressed: bars.cut}" title="Show cut bar"><i class="fas fa-cut"></i></button>
-        <button v-on:click="bars.bsearch = !bars.bsearch;" v-bind:class="{pressed: bars.bsearch}" title="Show binary search bar"><i class="fas fa-search"></i></button>
-        <span class="bar-flex-row-content"></span>
+      <!-- v-bind:style="{ 'aspect-ratio': aspectRatio }" -->
+      <img class="aspect-ratio-16-9" :src="previewSrc" v-on:click="navigateOnPreviewClick" />
+      <div class="overlay">
+        <div class="bar-flex-row">
+          <button v-on:click="pages.navigateBack()"><i class="fas fa-arrow-left"></i></button>
+          <span class="bar-flex-row-content"></span>
+          <button v-on:click="bars.nav = !bars.nav;" v-bind:class="{pressed: bars.nav}" title="Show navigation bar"><i class="fas fa-stream"></i></button>
+          <button v-on:click="bars.time = !bars.time;" v-bind:class="{pressed: bars.time}" title="Show time bar"><i class="fas fa-forward"></i></button>
+          <button v-on:click="bars.cut = !bars.cut;" v-bind:class="{pressed: bars.cut}" title="Show cut bar"><i class="fas fa-cut"></i></button>
+          <button v-on:click="bars.bsearch = !bars.bsearch;" v-bind:class="{pressed: bars.bsearch}" title="Show binary search bar"><i class="fas fa-search"></i></button>
+          <span class="bar-flex-row-content"></span>
+        </div>
       </div>
-      <div id="navigation-bar" v-if="bars.nav" v-on:click="navigateOnClick($event, 'navigation-bar')" style="cursor: pointer; padding-left: 1%;">
+      <div id="navigation-bar" v-if="bars.nav" v-on:click="navigateOnClick($event, 'navigation-bar')" class="navigation-bar">
         <span v-for="(part, index) in parts" v-bind:class="{ 'part-time': partIndex === index, 'part-even': index % 2 === 0, 'part-odd': index % 2 === 1 }"
           v-bind:style="{ width: (Math.floor((part ? part.duration : 0) * 980 / duration) / 10) + '%' }"></span>
         <span v-bind:style="{ left: (Math.floor(time * 980 / duration) / 10 + 1) + '%' }" class="position"></span>

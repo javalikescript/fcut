@@ -71,19 +71,26 @@ div.flow {
 .flow > i {
   margin: 1rem;
 }
-img.preview {
-  width: 100%;
+img.aspect-ratio-16-9 {
+  width: 100vw;
+  height: 56.25vw;
 }
 div.overlay {
   position: absolute;
   top: 0px;
   left: 0px;
   width: 100%;
+  height: 6rem;
   opacity: 0;
   transition: opacity 300ms;
 }
-div.overlay:hover, img.preview:hover + div.overlay {
+div.overlay:hover {
   opacity: 1;
+}
+.navigation-bar {
+  cursor: pointer;
+  padding-left: 1%;
+  height: 2rem;
 }
 span.part-even, span.part-odd {
   height: 0.6rem;
