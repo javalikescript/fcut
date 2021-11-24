@@ -49,8 +49,8 @@
     '<div class="file-chooser-content" style="overflow: auto;">' +
     '  <ul>' +
     '    <li v-for="file in filteredList" v-on:click="onFilePressed(file)">' +
-    '      <input type="checkbox" v-model="file.selected" :disabled="!file.selectable">' +
-    '      <span :class="[\'file\', file.isDirectory ? \'file-chooser-directory\' : \'\']">{{ file.name }}</span>' +
+    '      <input type="checkbox" v-model="file.selected" :disabled="!file.selectable" v-if="!file.isDirectory">' +
+    '      <span :class="{file: true, \'file-chooser-directory\': file.isDirectory, selected: file.selected }">{{ file.name }}</span>' +
     '    </li>' +
     '  </ul>' +
     '</div>' +

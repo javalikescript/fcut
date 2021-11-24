@@ -52,10 +52,14 @@ local CONFIG_SCHEMA = {
       type = 'string',
       default = '.',
     },
+    project = {
+      title = 'A project file to load',
+      type = 'string',
+    },
     ffmpeg = {
       title = 'The ffmpeg path',
       type = 'string',
-      default = (system.isWindows() and 'ffmpeg.exe' or '/usr/bin/ffmpeg'),
+      default = (system.isWindows() and 'ffmpeg\\ffmpeg.exe' or '/usr/bin/ffmpeg'),
     },
     ffprobe = {
       title = 'The ffprobe path',
@@ -71,7 +75,7 @@ local CONFIG_SCHEMA = {
           default = false,
         },
         ie = {
-          title = 'Disable Edge',
+          title = 'Disable WebView2 (Edge)',
           type = 'boolean',
           default = false,
         },
@@ -108,6 +112,10 @@ local function webSocketSend(line)
   if webSocket and line then
     webSocket:sendTextMessage(line)
   end
+end
+
+if config.webview.ie then
+  system.setenv('WEBVIEW2_WIN32_PATH', 'na')
 end
 
 local assetsHandler
@@ -162,6 +170,16 @@ WebView.open('http://localhost:'..tostring(config.webview.port)..'/', {
       local promise, callback = Promise.createWithCallback()
       FileChooser.listFiles(path, callback)
       return promise
+    end,
+    ['writeFile(requestJson)?method=POST&Content-Type=application/json'] = function(exchange, obj)
+      local f = File:new(obj.path)
+      f:write(obj.data)
+      return 'saved'
+    end,
+    ['readFile(requestJson)?method=POST'] = function(exchange)
+      local path = exchange:getRequest():getBody()
+      local f = File:new(path)
+      return f:readAll()
     end,
     ['fullscreen(requestJson)?method=POST&Content-Type=application/json'] = function(exchange, fullscreen)
       webview:fullscreen(fullscreen == true);

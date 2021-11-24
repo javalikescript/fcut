@@ -26,3 +26,9 @@
 .file-chooser-directory {
   text-decoration: underline;
 }
+.file-chooser-content input[type=checkbox] {
+    transform: scale(1.5);
+}
+.file-chooser-content span.file.selected {
+	font-weight: bold;
+}

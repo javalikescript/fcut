@@ -1,30 +1,4 @@
 
-function pad(n) {
-  return (n < 10 ? '0' : '') + n;
-}
-
-function formatHMS(time, long) {
-  var seconds = Math.floor(time) % 60;
-  var minutes = Math.floor(time / 60) % 60;
-  var hours = Math.floor(time / 3600);
-  if ((hours === 0) && !long) {
-    return '' + minutes + ':' + pad(seconds);
-  }
-  return '' + hours + ':' + pad(minutes) + ':' + pad(seconds);
-}
-
-function parseHMS(value) {
-  var parts = value.split(':').reverse().map(function(part) {
-    return parseInt(part, 10);
-  });
-  var seconds = parts[0] || 0;
-  var minutes = parts[1] || 0;
-  var hours = parts[2] || 0;
-  return hours * 3600 + minutes * 60 + seconds;
-}
-
-var fileChooserCallback;
-
 var vm = new Vue({
   el: '#app',
   data: {
@@ -33,18 +7,21 @@ var vm = new Vue({
     sources: {},
     previewSrc: 'roll.png',
     destinationFilename: 'out.mp4',
-    aspectRatio: '16/9',
+    aspectRatio: 0,
     bars: {
       nav: true,
       time: false,
       cut: true,
       bsearch: false,
-      part: false
+      project: false
     },
     period: 180,
     findPeriod: 180,
     findForward: true,
     exporting: false,
+    exportFormat: 'mp4',
+    exportVideoCodec: 'copy',
+    exportAudioCodec: 'copy',
     duration: 0,
     partIndex: 0,
     partTime: 0,
@@ -54,40 +31,8 @@ var vm = new Vue({
     time: 0
   },
   methods: {
-    onFileChoosed: function(names) {
-      pages.navigateBack();
-      if (fileChooserCallback) {
-        if (names && (names.length > 1)) {
-          var filenames = [];
-          var path = names.shift();
-          for (var i = 0; i < names.length; i++) {
-            var name = names[i];
-            filenames.push(path + '/' + name);
-          }
-          fileChooserCallback(undefined, filenames);
-        } else {
-          fileChooserCallback('No file selected');
-        }
-        fileChooserCallback = null;
-      }
-    },
     selectFiles: function(multiple, save) {
-      var fileChooser = this.$refs.fileChooser;
-      fileChooser.multiple = multiple === true;
-      fileChooser.save = save === true;
-      fileChooser.label = save ? 'Save' : 'Open';
-      //fileChooser.refresh();
-      fileChooser.list(this.config.media);
-      pages.navigateTo('file-chooser');
-      return new Promise(function(resolve, reject) {
-        fileChooserCallback = function(reason, filenames) {
-          if (!reason && filenames && (filenames.length > 0)) {
-            resolve(multiple ? filenames : filenames[0]);
-          } else {
-            reject(reason);
-          }
-        };
-      });
+      return chooseFiles(this.$refs.fileChooser, multiple, save, this.config.media);
     },
     addSources: function(beforeIndex) {
       var that = this;
@@ -116,13 +61,22 @@ var vm = new Vue({
         return that.openSourceById(sourceId);
       });
     },
-    loadConfig: function() {
+    loadConfig: function(boot) {
       var that = this;
       return fetch('config/').then(function(response) {
         return response.json();
       }).then(function(config) {
         console.info('config', config);
         that.config = config.value;
+        if (boot) {
+          if (that.config.project) {
+            that.loadProjectFromFile(that.config.project).then(function() {
+              pages.navigateTo('preview');
+            });
+          } else {
+            pages.navigateTo('home');
+          }
+        }
       });
     },
     openSourceById: function(sourceId) {
@@ -149,14 +103,26 @@ var vm = new Vue({
       } else {
         this.parts.push(part);
       }
-      this.duration += duration;
+      this.refreshParts();
     },
-    refreshDuration: function() {
-      this.duration = 0;
+    refreshParts: function() {
+      var duration = 0;
       for (var i = 0; i < this.parts.length; i++) {
         var part = this.parts[i];
-        this.duration += part.duration;
+        duration += part.duration;
       }
+      if (this.parts.length > 0) {
+        var part = this.parts[0];
+        var info = this.sources[part.sourceId];
+        for (var i = 0; i < info.streams.length; i++) {
+          var stream = info.streams[i];
+          if ((stream.codec_type === 'video') && stream.display_aspect_ratio) {
+            this.aspectRatio = computeAspectRatio(stream.display_aspect_ratio);
+            break;
+          }
+        }
+      }
+      this.duration = duration;
     },
     navigateOnPreviewClick: function(event) {
       var rect = event.target.getBoundingClientRect();
@@ -293,11 +259,56 @@ var vm = new Vue({
         body: JSON.stringify({
           filename: this.destinationFilename,
           parts: this.parts,
-          options: ['-f', 'mp4', '-c', 'copy']
+          options: [
+            '-f', this.exportFormat,
+            '-vcodec', this.exportVideoCodec,
+            '-acodec', this.exportAudioCodec,
+            '-sn'
+          ]
         })
       }).finally(function() {
         that.exporting = false;
-      })
+      });
+    },
+    saveProjectToJson: function() {
+      var sources = {};
+      for (var sourceId in this.sources) {
+        var source = this.sources[sourceId]
+        sources[sourceId] = source.format.filename; // TODO change
+      }
+      var project = {
+        parts: this.parts,
+        sources: sources
+      };
+      return project;
+    },
+    loadProjectFromJson: function(project) {
+      var that = this;
+      //console.info('projet', project);
+      return Promise.all(Object.keys(project.sources).map(function(sourceId) {
+        var filename = project.sources[sourceId];
+        return that.openSource(filename).then(function(id) {
+          if (id !== sourceId) {
+            return Promise.reject('Source id does not match');
+          }
+        });
+      })).then(function() {
+        that.parts = project.parts;
+        that.refreshParts();
+        that.navigateTo(0);
+      });
+    },
+    loadProjectFromFile: function(filename) {
+      var that = this;
+      return readFile(filename, true).then(function(prj) {
+        return that.loadProjectFromJson(prj);
+      });
+    },
+    openProject: function() {
+      var that = this;
+      return this.selectFiles(false, false).then(function(filename) {
+        return that.loadProjectFromFile(filename);
+      });
     }
   },
   computed: {
@@ -335,5 +346,4 @@ webSocket.onmessage = function(event) {
   buffers.splice(buffers.length, 0, lastBuffer, lastLine);
 };
 
-vm.loadConfig();
-pages.navigateTo('home');
+vm.loadConfig(true);

@@ -6,10 +6,20 @@ body {
 }
 a {
   text-decoration: none;
+  font-weight: bold;
   color: inherit;
+}
+a:hover {
+  text-decoration: underline;
 }
 a.time, input.time {
   text-align: right;
+}
+label {
+  padding-top: 0.6rem;
+}
+select {
+  max-width: 100%;
 }
 button, input {
   color: #FFF0E5;
@@ -39,8 +49,12 @@ button.pressed {
   width: 100%;
 	height: 100%;
 }
-section.page > div.padded {
+.padded {
   padding: 1rem;
+}
+section.page > div.padded:first-child {
+  overflow: auto;
+	height: 100%;
 }
 .bar-flex-row {
 	min-width: 100%;
@@ -71,9 +85,8 @@ div.flow {
 .flow > i {
   margin: 1rem;
 }
-img.aspect-ratio-16-9 {
+img.preview {
   width: 100vw;
-  height: 56.25vw;
 }
 div.overlay {
   position: absolute;
@@ -92,21 +105,11 @@ div.overlay:hover {
   padding-left: 1%;
   height: 2rem;
 }
-span.part-even, span.part-odd {
-  height: 0.6rem;
-}
-span.part-even, span.part-odd {
+span.part {
+  height: 0.8rem;
   display: inline-block;
   opacity: 0.5;
-}
-span.part-even {
-  background-color: skyblue;
-}
-span.part-odd {
-  background-color: lightsteelblue;
-}
-span.part-time {
-  opacity: 1;
+  border-radius: 0.2rem;
 }
 span.position {
   position: absolute;
@@ -117,9 +120,11 @@ span.position {
   border-radius: 1rem;
 	background-color: #3D3D3D;
 }
+div.input-bar, div.button-bar {
+  padding-top: 0.4rem;
+}
 div.button-bar {
   text-align: center;
-  padding-top: 0.4rem;
 }
 div.console {
   height: calc(100% - 3rem);
