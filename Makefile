@@ -48,7 +48,6 @@ dist-copy-windows:
 	-cp -u $(LUACLIBS)/win32.$(SO) $(FCUT_DIST)/bin/
 	cp -u $(LUACLIBS)/lua*.$(SO) $(FCUT_DIST)/bin/
 	cp -u $(LUACLIBS)/WebView2Loader.dll $(FCUT_DIST)/bin/
-	cp -ru ffmpeg/ $(FCUT_DIST)/
 	cp -u fcut.bat $(FCUT_DIST)/
 
 dist-copy: dist-copy-$(PLAT)
@@ -78,6 +77,9 @@ dist-prepare:
 
 dist: dist-clean dist-prepare dist-copy
 
+dist-full: dist
+	-cp -ru ffmpeg/ $(FCUT_DIST)/
+
 dist.tar.gz:
 	cd $(FCUT_DIST) && tar --group=jls --owner=jls -zcvf fcut$(DIST_SUFFIX).tar.gz *
 
@@ -85,5 +87,8 @@ dist.zip:
 	cd $(FCUT_DIST) && zip -r fcut$(DIST_SUFFIX).zip *
 
 dist-archive: dist dist$(ZIP)
+
+dist-full-archive: dist-full dist$(ZIP)
+	mv $(FCUT_DIST)/fcut$(DIST_SUFFIX).zip $(FCUT_DIST)/fcut-ffmpeg$(DIST_SUFFIX).zip
 
 .PHONY: dist
