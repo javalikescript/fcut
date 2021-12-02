@@ -5,10 +5,13 @@ local runtime = require('jls.lang.runtime')
 local Promise = require('jls.lang.Promise')
 local logger = require('jls.lang.logger')
 local event = require('jls.lang.event')
+local ProcessBuilder = require('jls.lang.ProcessBuilder')
+local Pipe = require('jls.io.Pipe')
 local File = require('jls.io.File')
 local tables = require('jls.util.tables')
+local strings = require('jls.util.strings')
 local Map = require('jls.util.Map')
-local WebView = require('jls.util.WebView')
+local HttpExchange = require('jls.net.http.HttpExchange')
 local FileHttpHandler = require('jls.net.http.handler.FileHttpHandler')
 local RestHttpHandler = require('jls.net.http.handler.RestHttpHandler')
 local ZipFileHttpHandler = require('jls.net.http.handler.ZipFileHttpHandler')
@@ -65,6 +68,12 @@ local CONFIG_SCHEMA = {
       title = 'The ffprobe path',
       type = 'string',
     },
+    loglevel = {
+      title = 'The log level',
+      type = 'string',
+      default = 'WARN',
+      enum = {'ERROR', 'WARN', 'INFO', 'CONFIG', 'FINE', 'FINER', 'FINEST', 'DEBUG', 'ALL'},
+    },
     webview = {
       type = 'object',
       additionalProperties = false,
@@ -74,10 +83,20 @@ local CONFIG_SCHEMA = {
           type = 'boolean',
           default = false,
         },
-        ie = {
-          title = 'Disable WebView2 (Edge)',
+        disable = {
+          title = 'Disable WebView',
           type = 'boolean',
           default = false,
+        },
+        ie = {
+          title = 'Enable IE',
+          type = 'boolean',
+          default = false,
+        },
+        address = {
+          title = 'The binding address',
+          type = 'string',
+          default = '::'
         },
         port = {
           title = 'WebView HTTP server port',
@@ -97,6 +116,8 @@ local config = tables.createArgumentTable(arg, {
   emptyPath = 'config',
   schema = CONFIG_SCHEMA
 });
+
+logger:setLevel(config.loglevel)
 
 local execWorker = ExecWorker:new()
 local ffmpeg = Ffmpeg:new(config, execWorker)
@@ -127,14 +148,10 @@ elseif assetsZip:isFile() then
   assetsHandler = ZipFileHttpHandler:new(assetsZip)
 end
 
-WebView.open('http://localhost:'..tostring(config.webview.port)..'/', {
-  title = 'Fast Cut (Preview)',
-  resizable = true,
-  bind = true,
-  debug = config.webview.debug,
-}):next(function(webview)
-  local httpServer = webview:getHttpServer()
-  logger:info('WebView opened with HTTP Server bound on port '..tostring(select(2, httpServer:getAddress())))
+local exportContexts = {}
+
+local function createHttpContexts(httpServer)
+  logger:info('HTTP Server bound on port '..tostring(select(2, httpServer:getAddress())))
   httpServer:createContext('/(.*)', FileHttpHandler:new(File:new(scriptDir, 'htdocs'), nil, 'fcut.html'))
   httpServer:createContext('/config/(.*)', TableHttpHandler:new(config, nil, true))
   httpServer:createContext('/assets/(.*)', assetsHandler)
@@ -171,8 +188,26 @@ WebView.open('http://localhost:'..tostring(config.webview.port)..'/', {
       FileChooser.listFiles(path, callback)
       return promise
     end,
+    ['getFile?method=POST'] = function(exchange)
+      local path = exchange:getRequest():getBody()
+      local file = File:new(path)
+      if not file:exists() then
+        HttpExchange.notFound(exchange, 'File not found')
+        return false
+      end
+      return {
+        name = file:getName(),
+        isDirectory = file:isDirectory(),
+        length = file:length(),
+        lastModified = file:lastModified(),
+      }
+    end,
     ['writeFile(requestJson)?method=POST&Content-Type=application/json'] = function(exchange, obj)
       local f = File:new(obj.path)
+      if not obj.overwrite and f:exists() then
+        HttpExchange.forbidden(exchange, 'The file exists')
+        return false
+      end
       f:write(obj.data)
       return 'saved'
     end,
@@ -181,49 +216,107 @@ WebView.open('http://localhost:'..tostring(config.webview.port)..'/', {
       local f = File:new(path)
       return f:readAll()
     end,
-    ['fullscreen(requestJson)?method=POST&Content-Type=application/json'] = function(exchange, fullscreen)
-      webview:fullscreen(fullscreen == true);
+    ['cancelExport?method=POST'] = function(exchange)
+      local exportId = exchange:getRequest():getBody()
+      local exportContext = exportContexts[exportId]
+      if exportContext and exportContext.process then
+        exportContext.process:destroy()
+        exportContexts[exportId] = nil
+      end
     end,
     ['export(requestJson)?method=POST&Content-Type=application/json'] = function(exchange, parameters)
       local commands = ffmpeg:createCommands(parameters.filename, parameters.parts, parameters.options or {}, parameters.seekDelayMs)
-      logger:info(tostring(#commands)..' command(s)')
-      local function executeNextCommand()
-        local command = table.remove(commands, 1)
-        if command then
-          local line = runtime.formatCommandLine(command.line)
-          logger:info('execute: '..tostring(line))
-          return execWorker:execute(line, nil, webSocketSend, 'error'):next(function()
-            logger:info('execute done, '..tostring(#commands)..' command(s)')
-            return executeNextCommand()
-          end)
-        end
-        return Promise.resolve();
-      end
-      return executeNextCommand():next(function()
-        logger:info('export completed')
-      end, function()
-        logger:info('export failed')
-      end)
+      local exportId = strings.formatInteger(system.currentTimeMillis(), 64)
+      logger:info('export '..exportId..' '..tostring(#commands)..' command(s)')
+      exportContexts[exportId] = {
+        commands = commands,
+      }
+      return exportId
     end,
   }))
-  httpServer:createContext('/console/', Map.assign(WebSocketUpgradeHandler:new(), {
-    onOpen = function(_, newWebSocket)
-      if webSocket then
+  httpServer:createContext('/console/(.*)', Map.assign(WebSocketUpgradeHandler:new(), {
+    onOpen = function(_, webSocket, exchange)
+      local exportId = exchange:getRequestArguments()
+      local exportContext = exportContexts[exportId]
+      if not exportContext then
         webSocket:close()
+        return
       end
-      webSocket = newWebSocket
+      exportContext.index = 0
+      local function endExport(exitCode)
+        exportContext.exitCode = exitCode
+        webSocket:close()
+        exportContexts[exportId] = nil
+      end
+      local function startNextCommand()
+        exportContext.index = exportContext.index + 1
+        if exportContext.index > #exportContext.commands then
+          endExport(0)
+          return
+        end
+        local command = exportContext.commands[exportContext.index]
+        local pb = ProcessBuilder:new(command.line)
+        local p = Pipe:new()
+        pb:redirectError(p)
+        local ph = pb:start(function(exitCode)
+          if exitCode == 0 then
+            startNextCommand()
+          else
+            endExport(exitCode)
+          end
+        end)
+        exportContext.process = ph
+        p:readStart(function(err, data)
+          if err then
+            p:close()
+          elseif data then
+            webSocket:sendTextMessage(data)
+          else
+            p:close()
+          end
+        end)
+      end
+      startNextCommand()
     end
   }))
-  return webview:getThread():ended()
-end):next(function()
-  logger:info('WebView closed')
-end):catch(function(err)
-  logger:info('Cannot open webview due to '..tostring(err))
-end):next(function()
-  execWorker:close()
-  if webSocket then
-    webSocket:close()
-  end
-end)
+end
+
+if config.webview.disable then
+  local httpServer = require('jls.net.http.HttpServer'):new()
+  httpServer:bind(config.webview.address, config.webview.port):next(function()
+    createHttpContexts(httpServer)
+    if config.webview.port == 0 then
+      print('FCut HTTP Server available at http://localhost:'..tostring(select(2, httpServer:getAddress())))
+    end
+  end, function(err)
+    logger:warn('Cannot bind HTTP server due to '..tostring(err))
+    os.exit(1)
+  end)
+else
+  require('jls.util.WebView').open('http://localhost:'..tostring(config.webview.port)..'/', {
+    title = 'Fast Cut (Preview)',
+    resizable = true,
+    bind = true,
+    debug = config.webview.debug,
+  }):next(function(webview)
+    local httpServer = webview:getHttpServer()
+    createHttpContexts(httpServer)
+    httpServer:createContext('/webview/(.*)', RestHttpHandler:new({
+      ['fullscreen(requestJson)?method=POST&Content-Type=application/json'] = function(exchange, fullscreen)
+        webview:fullscreen(fullscreen == true);
+      end,
+    }))
+    return webview:getThread():ended()
+  end):next(function()
+    logger:info('WebView closed')
+  end):catch(function(err)
+    logger:warn('Cannot open webview due to '..tostring(err))
+  end):next(function()
+    execWorker:close()
+    if webSocket then
+      webSocket:close()
+    end
+  end)
+end
 
 event:loop()

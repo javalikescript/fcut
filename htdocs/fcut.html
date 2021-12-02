@@ -37,7 +37,22 @@
     <page name="file-chooser">
       <file-chooser-dialog v-on:selected="onFileChoosed" fetch="true" ref="fileChooser"></file-chooser-dialog>
     </page>
-    <page name="preview">
+    <page name="message">
+      <div class="padded">
+        <div class="bar-flex-row">
+          <span class="bar-flex-row-content"></span>
+          <label>{{ messageTitle }}</label>
+          <span class="bar-flex-row-content"></span>
+          <button v-on:click="onMessageClosed()"><i class="fas fa-times"></i></button>
+        </div>
+        <p v-for="line in messageLines">{{ line }}</p>
+        <div class="button-bar">
+          <button v-on:click="onMessageClosed('ok')">Ok</button>
+          <button v-on:click="onMessageClosed()">Cancel</button>
+        </div>
+      </div>
+    </page>
+    <page name="preview" eclass="scroll">
       <img v-bind:style="{ height: aspectRatio > 0 ? (Math.floor(10000 / aspectRatio) / 100) + 'vw' : undefined }" class="preview" :src="previewSrc" v-on:click="navigateOnPreviewClick" />
       <div class="overlay padded">
         <div class="bar-flex-row">
@@ -95,7 +110,7 @@
           <option value="1">1:1</option>
         </select>
         <button v-on:click="openProject()" title="Select FCut Project file to open"><i class="fas fa-file"></i> Open...</button>
-        <button v-on:click="selectFiles(false, true).then(function(fn) { writeFile(fn, JSON.stringify(saveProjectToJson(), null, 2)); })" title="Select FCut Project file to save as"><i class="fas fa-save"></i> Save as...</button>
+        <button v-on:click="saveProject()" title="Select FCut Project file to save as"><i class="fas fa-save"></i> Save as...</button>
       </div>
     </page>
     <page name="export">
@@ -173,17 +188,20 @@
           <button v-on:click="selectFiles(false, true).then(function(filename) { destinationFilename = filename; })"><i class="fas fa-file"></i></button>
         </div>
         <div class="button-bar">
-          <button v-bind:disabled="exporting || parts.length === 0" v-on:click="exportVideo()"><i class="fas fa-cogs"></i> Export</button>
-          <button v-bind:disabled="!exporting" v-on:click="pages.navigateTo('console')"><i class="fas fa-terminal"></i></button>
+          <button v-bind:disabled="exportId || parts.length === 0" v-on:click="startExport()"><i class="fas fa-cogs"></i> Export</button>
+          <button v-bind:disabled="!exportId" v-on:click="pages.navigateTo('console')"><i class="fas fa-terminal"></i></button>
         </div>
       </div>
     </page>
     <page name="console">
       <div class="bar-flex-row">
         <button v-on:click="pages.navigateBack()"><i class="fas fa-arrow-left"></i></button>
-      </div>
+        <span class="bar-flex-row-content"></span>
+        <button v-on:click="stopExport()" title="Stop export"><i class="fas fa-times"></i></button>
+    </div>
       <div class="console">
-        <pre v-for="buffer in buffers">{{ buffer }}</pre>
+        <pre>{{ logBuffer }}</pre>
+        <pre>{{ logLine }}</pre>
       </div>
     </page>
     <page name="about">

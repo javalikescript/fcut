@@ -10,8 +10,8 @@ body {
 section.page {
   position: absolute;
   margin: 0;
-  height: 100%;
   width: 100%;
+  height: 100%;
   transition: all 0.25s ease;
   background-color: inherit;
 }

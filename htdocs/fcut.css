@@ -52,9 +52,13 @@ button.pressed {
 .padded {
   padding: 1rem;
 }
+section[name=preview].page {
+  overflow-y: auto;
+}
 section.page > div.padded:first-child {
-  overflow: auto;
+  overflow-y: auto;
 	height: 100%;
+  box-sizing: border-box;
 }
 .bar-flex-row {
 	min-width: 100%;
@@ -92,7 +96,7 @@ div.overlay {
   position: absolute;
   top: 0px;
   left: 0px;
-  width: 100%;
+  right: 0px;
   height: 6rem;
   opacity: 0;
   transition: opacity 300ms;

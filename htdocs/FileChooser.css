@@ -1,18 +1,25 @@
 .file-chooser-dialog {
-	display: flex;
-	flex-direction: column;
+  display: flex;
+  flex-direction: column;
 }
 .file-chooser-content {
-	flex-grow: 1;
+  flex-grow: 1;
 }
 .file-chooser-flex-row {
-	min-width: 100%;
-	display: flex;
-	flex-direction: row;
+  min-width: 100%;
+  display: flex;
+  flex-direction: row;
+}
+.file-chooser-flex-row + .file-chooser-flex-row {
+  margin-top: 0.5rem;
 }
 .file-chooser-flex-row > * {
   margin-top: auto;
   margin-bottom: auto;
+}
+.file-chooser-flex-row > span {
+  margin-left: 0.5rem;
+  margin-right: 0.5rem;
 }
 .file-chooser-flex-row-content {
 	flex-grow: 1;
@@ -26,8 +33,8 @@
 .file-chooser-directory {
   text-decoration: underline;
 }
-.file-chooser-content input[type=checkbox] {
-    transform: scale(1.5);
+.file-chooser-dialog input[type=checkbox] {
+  transform: scale(1.5);
 }
 .file-chooser-content span.file.selected {
 	font-weight: bold;

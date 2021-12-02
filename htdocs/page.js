@@ -3,8 +3,11 @@ var pages = {
   fallbackName: '',
   names: {},
   navigationHistory: [],
-  navigateTo: function(name) {
+  navigateTo: function(name, replace) {
     this.name = name;
+    if (replace) {
+      this.navigationHistory.pop();
+    }
     this.navigationHistory.push(name);
   },
   navigateBack: function() {
@@ -25,7 +28,7 @@ Vue.component('page', {
     };
   },
   props: ['name'],
-  template: '<section :ref="name" class="page" v-bind:name="name" v-bind:class="[ pages.name === name ? \'\' : hideClass ]">'
+  template: '<section :ref="name" v-bind:name="name" v-bind:class="[{page: true}, pages.name === name ? \'\' : hideClass]">'
     + '<slot>Article</slot></section>',
   created: function() {
     this.pages.names[this.name] = this;

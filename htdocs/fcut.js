@@ -18,7 +18,7 @@ var vm = new Vue({
     period: 180,
     findPeriod: 180,
     findForward: true,
-    exporting: false,
+    exportId: false,
     exportFormat: 'mp4',
     exportVideoCodec: 'copy',
     exportAudioCodec: 'copy',
@@ -27,12 +27,29 @@ var vm = new Vue({
     partTime: 0,
     partEndTime: 0,
     partInfo: {},
-    buffers: ['', ''],
-    time: 0
+    time: 0,
+    logBuffer: '',
+    logLine: '',
+    keepFileChooserPath: false,
+    messageTitle: '',
+    messageLines: []
   },
   methods: {
+    showMessage: function(text, title) {
+      if (Array.isArray(text)) {
+        this.messageLines = text;
+      } else if (typeof text === 'string') {
+        this.messageLines = text.split('\n');
+      } else {
+        this.messageLines = ['Are you sure?'];
+      }
+      this.messageTitle = title || 'Message';
+      return showMessage();
+    },
     selectFiles: function(multiple, save) {
-      return chooseFiles(this.$refs.fileChooser, multiple, save, this.config.media);
+      var path = this.keepFileChooserPath ? undefined : this.config.media;
+      this.keepFileChooserPath = true;
+      return chooseFiles(this.$refs.fileChooser, multiple, save, path);
     },
     addSources: function(beforeIndex) {
       var that = this;
@@ -245,29 +262,78 @@ var vm = new Vue({
     move: function(delta) {
       this.navigateTo(this.time + delta);
     },
-    exportVideo: function() {
-      if (this.exporting) {
-        return;
-      }
-      this.exporting = true;
-      var that = this;
-      return fetch('rest/export', {
+    stopExport: function() {
+      return fetch('rest/cancelExport', {
         method: 'POST',
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "text/plain"
         },
-        body: JSON.stringify({
-          filename: this.destinationFilename,
-          parts: this.parts,
-          options: [
-            '-f', this.exportFormat,
-            '-vcodec', this.exportVideoCodec,
-            '-acodec', this.exportAudioCodec,
-            '-sn'
-          ]
-        })
-      }).finally(function() {
-        that.exporting = false;
+        body: this.exportId
+      }).then(function() {
+      });
+    },
+    startExport: function() {
+      if (this.exportId) {
+        return;
+      }
+      var request = {
+        filename: this.destinationFilename,
+        parts: this.parts,
+        options: [
+          '-f', this.exportFormat,
+          '-vcodec', this.exportVideoCodec,
+          '-acodec', this.exportAudioCodec,
+          '-sn'
+        ]
+      };
+      this.exportId = true;
+      this.logBuffer = '';
+      this.logLine = '';
+      var that = this;
+      return checkFile(this.destinationFilename).catch(function(filename) {
+        return that.showMessage('The file exists.\n' + filename + '\nDo you want to overwrite?');
+      }).then(function() {
+        return fetch('rest/export', {
+          method: 'POST',
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(request)
+        });
+      }).then(function(response) {
+        return response.text();
+      }).then(function(exportId) {
+        that.exportId = exportId;
+        var webSocket = new WebSocket('ws://' + location.host + '/console/' + exportId);
+        var cr = false;
+        webSocket.onmessage = function(event) {
+          var content = event.data;
+          if (cr) {
+            that.logLine = '';
+            cr = false;
+          }
+          var index = content.lastIndexOf('\n');
+          if (index >= 0) {
+            that.logBuffer += '\n' + that.logLine + content.substring(0, index);
+            that.logLine = content.substring(index + 1);
+            // TODO scroll
+          } else {
+            index = content.lastIndexOf('\r');
+            if (index >= 0) {
+              if (index == content.length - 1) {
+                that.logLine += content.substring(0, index);
+                cr = true;
+              } else {
+                that.logLine = content.substring(index + 1);
+              }
+            } else {
+              that.logLine += content;
+            }
+          }
+        };
+        webSocket.onclose = function() {
+          that.exportId = false;
+        };
       });
     },
     saveProjectToJson: function() {
@@ -304,6 +370,17 @@ var vm = new Vue({
         return that.loadProjectFromJson(prj);
       });
     },
+    saveProject: function() {
+      var content = JSON.stringify(this.saveProjectToJson(), null, 2)
+      var that = this;
+      return this.selectFiles(false, true).then(function(filename) {
+        return checkFile(filename).catch(function(filename) {
+          return that.showMessage('The file exists.\n' + filename + '\nDo you want to overwrite?');
+        }).then(function() {
+          writeFile(filename, content, true);
+        });
+      });
+    },
     openProject: function() {
       var that = this;
       return this.selectFiles(false, false).then(function(filename) {
@@ -330,20 +407,5 @@ var vm = new Vue({
     }
   }
 });
-
-var webSocket = new WebSocket('ws://' + location.host + '/console/');
-webSocket.onmessage = function(event) {
-  var newLine = event.data;
-  //console.info('webSocket message', newLine);
-  var buffers = vm.buffers;
-  var lastLine = buffers.pop();
-  var lastBuffer = buffers.pop();
-  // TODO support CR/13, CR+LF/13+10, BS/8 and SUB/26
-  if (newLine.charAt(0) !== '\r') {
-    lastBuffer += lastLine;
-  }
-  lastLine = newLine;
-  buffers.splice(buffers.length, 0, lastBuffer, lastLine);
-};
 
 vm.loadConfig(true);

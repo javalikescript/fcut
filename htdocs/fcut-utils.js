@@ -54,11 +54,45 @@ function computeAspectRatio(value) {
   return Math.floor(value * 1000000) / 1000000;
 }
 
-var fileChooserCallback;
+var messageCallback = null;
+
+function onMessageClosed(response) {
+  pages.navigateBack();
+  if (messageCallback) {
+    var cb = messageCallback;
+    messageCallback = null;
+    if (response) {
+      cb(undefined, response);
+    } else {
+      cb('Cancelled');
+    }
+  }
+}
+
+function showMessage() {
+  if (messageCallback) {
+    throw new Error('Message already shown');
+  }
+  pages.navigateTo('message');
+  return new Promise(function(resolve, reject) {
+    messageCallback = function(reason, result) {
+      if (reason) {
+        reject(reason);
+      } else {
+        resolve(result);
+      }
+    };
+  });
+}
+
+
+var fileChooserCallback = null;
 
 function onFileChoosed(names) {
   pages.navigateBack();
   if (fileChooserCallback) {
+    var cb = fileChooserCallback;
+    fileChooserCallback = null;
     if (names && (names.length > 1)) {
       var filenames = [];
       var path = names.shift();
@@ -66,11 +100,10 @@ function onFileChoosed(names) {
         var name = names[i];
         filenames.push(path + '/' + name);
       }
-      fileChooserCallback(undefined, filenames);
+      cb(undefined, filenames);
     } else {
-      fileChooserCallback('No file selected');
+      cb('No file selected');
     }
-    fileChooserCallback = null;
   }
 }
 
@@ -95,7 +128,27 @@ function chooseFiles(fileChooser, multiple, save, path) {
   });
 }
 
-function writeFile(path, data) {
+function getFile(path) {
+  return fetch('rest/getFile', {
+    method: 'POST',
+    headers: {
+      "Content-Type": "text/plain"
+    },
+    body: path
+  }).then(function(response) {
+    return response.json();
+  });
+}
+
+function checkFile(path) {
+  return getFile(path).then(function() {
+    return Promise.reject(path);
+  }, function() {
+    return Promise.resolve(path);
+  });
+}
+
+function writeFile(path, data, overwrite) {
   return fetch('rest/writeFile', {
     method: 'POST',
     headers: {
@@ -103,7 +156,8 @@ function writeFile(path, data) {
     },
     body: JSON.stringify({
       path: path,
-      data: data
+      data: data,
+      overwrite: overwrite
     })
   });
 }
