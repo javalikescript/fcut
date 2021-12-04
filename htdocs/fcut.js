@@ -1,9 +1,11 @@
 
+var partRegExp = /^\n -- starting command ([0-9]+)\/([0-9]+)\s/;
+var timeRegExp = /^frame=.*\stime=([0-9:.]+)\s/;
+
 var vm = new Vue({
   el: '#app',
   data: {
     config: {},
-    parts: [],
     sources: {},
     previewSrc: 'roll.png',
     destinationFilename: 'out.mp4',
@@ -22,7 +24,9 @@ var vm = new Vue({
     exportFormat: 'mp4',
     exportVideoCodec: 'copy',
     exportAudioCodec: 'copy',
+    exportEnableSubtitle: false,
     duration: 0,
+    parts: [],
     partIndex: 0,
     partTime: 0,
     partEndTime: 0,
@@ -30,6 +34,11 @@ var vm = new Vue({
     time: 0,
     logBuffer: '',
     logLine: '',
+    logTime: 0,
+    logPartIndex: 0,
+    logPartCount: 0,
+    logDuration: 0,
+    logPermil: 0,
     keepFileChooserPath: false,
     messageTitle: '',
     messageLines: []
@@ -46,14 +55,14 @@ var vm = new Vue({
       this.messageTitle = title || 'Message';
       return showMessage();
     },
-    selectFiles: function(multiple, save) {
+    selectFiles: function(multiple, save, extention) {
       var path = this.keepFileChooserPath ? undefined : this.config.media;
       this.keepFileChooserPath = true;
-      return chooseFiles(this.$refs.fileChooser, multiple, save, path);
+      return chooseFiles(this.$refs.fileChooser, multiple, save, path, extention);
     },
     addSources: function(beforeIndex) {
       var that = this;
-      return this.selectFiles(true).then(function(filenames) {
+      return this.selectFiles(true, false, '.m2ts').then(function(filenames) {
         return Promise.all(filenames.map(function(filename) {
           return that.openSource(filename, beforeIndex).then(function(sourceId) {
             that.addSource(sourceId, beforeIndex);
@@ -80,18 +89,26 @@ var vm = new Vue({
     },
     loadConfig: function(boot) {
       var that = this;
-      return fetch('config/').then(function(response) {
+      return Promise.all([fetch('config/').then(function(response) {
         return response.json();
-      }).then(function(config) {
-        console.info('config', config);
+      }), fetch('/rest/checkFFmpeg', { method: 'POST' }).then(function(response) {
+        return response.json();
+      })]).then(function(values) {
+        var config = values[0];
+        var checkFFmpeg = values[1];
+        //console.info('config', config, 'checkFFmpeg', checkFFmpeg);
         that.config = config.value;
         if (boot) {
-          if (that.config.project) {
-            that.loadProjectFromFile(that.config.project).then(function() {
-              pages.navigateTo('preview');
-            });
+          if (checkFFmpeg.status) {
+            if (that.config.project) {
+              that.loadProjectFromFile(that.config.project).then(function() {
+                pages.navigateTo('preview');
+              });
+            } else {
+              pages.navigateTo('home');
+            }
           } else {
-            pages.navigateTo('home');
+            pages.navigateTo('missingConfig');
           }
         }
       });
@@ -101,7 +118,7 @@ var vm = new Vue({
       return fetch('source/' + sourceId + '/info.json').then(function(response) {
         return response.json();
       }).then(function(info) {
-        console.info('info', info);
+        //console.info('info', info);
         that.sources[sourceId] = info;
         return sourceId;
       });
@@ -272,23 +289,82 @@ var vm = new Vue({
       }).then(function() {
       });
     },
+    logMessage: function(content) {
+      if (this.logCR) {
+        this.logLine = '';
+        this.logCR = false;
+      }
+      var found = timeRegExp.exec(content);
+      if (found) {
+        var time = parseHMS(found[1]);
+        if (time) {
+          this.logTime = this.logCompletedTime + time;
+          this.logPermil = Math.floor(this.logTime * 1000 / this.logDuration)
+        }
+      } else {
+        found = partRegExp.exec(content);
+        if (found) {
+          this.logPartIndex = parseInt(found[1], 10);
+          if (this.logPartIndex <= this.logPartCount) {
+            this.logCompletedTime = this.logTime;
+          } else {
+            this.logCompletedTime = 0;
+          }
+        }
+      }
+      var index = content.lastIndexOf('\n');
+      if (index >= 0) {
+        this.logBuffer += '\n' + this.logLine + content.substring(0, index);
+        this.logLine = content.substring(index + 1);
+      } else {
+        index = content.lastIndexOf('\r');
+        if (index >= 0) {
+          if (index == content.length - 1) {
+            this.logLine += content.substring(0, index);
+            this.logCR = true;
+          } else {
+            this.logLine = content.substring(index + 1);
+          }
+        } else {
+          this.logLine += content;
+        }
+      }
+    },
     startExport: function() {
       if (this.exportId) {
         return;
       }
+      var options = [];
+      if (this.exportFormat !== '-') {
+        options.push('-f', this.exportFormat);
+      }
+      if (this.exportVideoCodec !== '-') {
+        options.push('-vcodec', this.exportVideoCodec);
+      } else {
+        options.push('-vn');
+      }
+      if (this.exportAudioCodec !== '-') {
+        options.push('-acodec', this.exportAudioCodec);
+      } else {
+        options.push('-an');
+      }
+      if (!this.exportEnableSubtitle) {
+        options.push('-sn');
+      }
       var request = {
         filename: this.destinationFilename,
         parts: this.parts,
-        options: [
-          '-f', this.exportFormat,
-          '-vcodec', this.exportVideoCodec,
-          '-acodec', this.exportAudioCodec,
-          '-sn'
-        ]
+        options: options
       };
       this.exportId = true;
       this.logBuffer = '';
       this.logLine = '';
+      this.logCR = false;
+      this.logPartCount = this.parts.length;
+      this.logDuration = this.duration;
+      this.logTime = 0;
+      this.logCompletedTime = 0;
+      this.logPermil = 0;
       var that = this;
       return checkFile(this.destinationFilename).catch(function(filename) {
         return that.showMessage('The file exists.\n' + filename + '\nDo you want to overwrite?');
@@ -305,31 +381,8 @@ var vm = new Vue({
       }).then(function(exportId) {
         that.exportId = exportId;
         var webSocket = new WebSocket('ws://' + location.host + '/console/' + exportId);
-        var cr = false;
         webSocket.onmessage = function(event) {
-          var content = event.data;
-          if (cr) {
-            that.logLine = '';
-            cr = false;
-          }
-          var index = content.lastIndexOf('\n');
-          if (index >= 0) {
-            that.logBuffer += '\n' + that.logLine + content.substring(0, index);
-            that.logLine = content.substring(index + 1);
-            // TODO scroll
-          } else {
-            index = content.lastIndexOf('\r');
-            if (index >= 0) {
-              if (index == content.length - 1) {
-                that.logLine += content.substring(0, index);
-                cr = true;
-              } else {
-                that.logLine = content.substring(index + 1);
-              }
-            } else {
-              that.logLine += content;
-            }
-          }
+          that.logMessage(event.data);
         };
         webSocket.onclose = function() {
           that.exportId = false;
@@ -373,7 +426,7 @@ var vm = new Vue({
     saveProject: function() {
       var content = JSON.stringify(this.saveProjectToJson(), null, 2)
       var that = this;
-      return this.selectFiles(false, true).then(function(filename) {
+      return this.selectFiles(false, true, '.json').then(function(filename) {
         return checkFile(filename).catch(function(filename) {
           return that.showMessage('The file exists.\n' + filename + '\nDo you want to overwrite?');
         }).then(function() {
@@ -383,7 +436,7 @@ var vm = new Vue({
     },
     openProject: function() {
       var that = this;
-      return this.selectFiles(false, false).then(function(filename) {
+      return this.selectFiles(false, false, '.json').then(function(filename) {
         return that.loadProjectFromFile(filename);
       });
     }

@@ -112,7 +112,6 @@ div.overlay:hover {
 span.part {
   height: 0.8rem;
   display: inline-block;
-  opacity: 0.5;
   border-radius: 0.2rem;
 }
 span.position {
@@ -133,4 +132,8 @@ div.button-bar {
 div.console {
   height: calc(100% - 3rem);
   overflow: auto;
+}
+div.console > pre {
+  font-size: 0.9rem;
+  margin: 0px;
 }

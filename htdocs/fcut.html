@@ -20,7 +20,8 @@
     <page name="home">
       <div class="padded">
         <div class="bar-flex-row">
-          <button v-on:click="openProject().then(function() { pages.navigateTo('preview'); })"><i class="fas fa-file"></i></button>
+          <button v-on:click="openProject().then(function() { pages.navigateTo('preview'); })" title="Select FCut Project file to open"><i class="fas fa-file"></i></button>
+          <button v-on:click="saveProject()" title="Select FCut Project file to save as"><i class="fas fa-save"></i></button>
           <span class="bar-flex-row-content"></span>
           <button v-on:click="pages.navigateTo('about')"><i class="fas fa-question"></i></button>
         </div>
@@ -67,7 +68,10 @@
         </div>
       </div>
       <div id="navigation-bar" v-if="bars.nav" v-on:click="navigateOnClick($event, 'navigation-bar')" class="navigation-bar">
-        <span v-for="(part, index) in parts" class="part" v-bind:style="{ 'background-color': hsvToRgb((index * 67) % 240 / 240, 0.8, partIndex === index ? 0.8 : 0.5), width: (Math.floor((part ? part.duration : 0) * 980 / duration) / 10) + '%' }"></span>
+        <span v-for="(part, index) in parts" class="part" v-bind:style="{
+          'background-color': hsvToRgb((index * 67) % 240 / 240, 0.8, partIndex === index ? 0.8 : 0.5),
+          width: (Math.floor((part ? part.duration : 0) * 980 / duration) / 10) + '%'
+        }"></span>
         <span v-bind:style="{ left: (Math.floor(time * 980 / duration) / 10 + 1) + '%' }" class="position"></span>
       </div>
       <div v-if="bars.time" class="button-bar" title="Preview time">
@@ -115,93 +119,128 @@
     </page>
     <page name="export">
       <div class="padded">
-        <button v-on:click="pages.navigateBack()"><i class="fas fa-arrow-left"></i></button>
-        <h2>Export</h2>
-        <div class="input-bar">
-          <label>Format:</label>
-          <select v-model="exportFormat" title="Format">
-            <option value="dvd">MPEG-2 PS (DVD VOB)</option>
-            <option value="flv">FLV (Flash Video)</option>
-            <option value="gif">GIF Animation</option>
-            <option value="m4v">raw MPEG-4 video</option>
-            <option value="matroska">Matroska</option>
-            <option value="mjpeg">raw MJPEG video</option>
-            <option value="mov">QuickTime / MOV</option>
-            <option value="mp4">MP4 (MPEG-4 Part 14)</option>
-            <option value="mpeg">MPEG-1 Program Stream (mpeg)</option>
-            <option value="mpegts">MPEG-2 Transport Stream (mpegts)</option>
-            <option value="ogv">Ogg Video</option>
-            <option value="svcd">MPEG-2 PS (SVCD)</option>
-            <option value="vcd">MPEG-1 Program Stream (VCD)</option>
-            <option value="vob">MPEG-2 PS (VOB)</option>
-            <option value="webm">WebM</option>
-          </select>
-        </div>
-        <div class="input-bar">
-          <label>Video Codec:</label>
-          <select v-model="exportVideoCodec" title="Select Video Codec">
-            <option value="copy">copy</option>
-            <option value="dvvideo">DV (Digital Video)</option>
-            <option value="flv1">FLV / Sorenson Spark / Sorenson H.263 (Flash Video)</option>
-            <option value="gif">GIF (Graphics Interchange Format)</option>
-            <option value="h261">H.261</option>
-            <option value="h263">H.263 / H.263-1996, H.263+ / H.263-1998 / H.263 version 2</option>
-            <option value="h263p">H.263+ / H.263-1998 / H.263 version 2</option>
-            <option value="h264">H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10</option>
-            <option value="hevc">H.265 / HEVC (High Efficiency Video Coding)</option>
-            <option value="mjpeg">Motion JPEG</option>
-            <option value="mpeg1video">MPEG-1 video</option>
-            <option value="mpeg2video">MPEG-2 video</option>
-            <option value="mpeg4">MPEG-4 part 2</option>
-            <option value="msmpeg4v2">MPEG-4 part 2 Microsoft variant version 2</option>
-            <option value="msmpeg4v3">MPEG-4 part 2 Microsoft variant version 3</option>
-            <option value="msvideo1">Microsoft Video 1</option>
-            <option value="png">PNG (Portable Network Graphics) image</option>
-            <option value="rawvideo">raw video</option>
-            <option value="theora">Theora</option>
-            <option value="vp8">On2 VP8</option>
-            <option value="vp9">Google VP9</option>
-            <option value="wmv1">Windows Media Video 7</option>
-            <option value="wmv2">Windows Media Video 8</option>
-          </select>
-        </div>
-        <div class="input-bar">
-          <label>Audio Codec:</label>
-          <select v-model="exportAudioCodec" title="Select Audio Codec">
-            <option value="copy">copy</option>
-            <option value="aac">AAC (Advanced Audio Coding) (encoders: aac libvo_aacenc )</option>
-            <option value="ac3">ATSC A/52A (AC-3) (encoders: ac3 ac3_fixed )</option>
-            <option value="alac">ALAC (Apple Lossless Audio Codec)</option>
-            <option value="dts">DCA (DTS Coherent Acoustics) (decoders: dca ) (encoders: dca )</option>
-            <option value="eac3">ATSC A/52B (AC-3, E-AC-3)</option>
-            <option value="flac">FLAC (Free Lossless Audio Codec)</option>
-            <option value="mp2">MP2 (MPEG audio layer 2) (decoders: mp2 mp2float ) (encoders: mp2 libtwolame )</option>
-            <option value="mp3">MP3 (MPEG audio layer 3) (decoders: mp3 mp3float ) (encoders: libmp3lame )</option>
-            <option value="vorbis">Vorbis (decoders: vorbis libvorbis ) (encoders: vorbis libvorbis )</option>
-            <option value="wmav1">Windows Media Audio 1</option>
-            <option value="wmav2">Windows Media Audio 2</option>
-          </select>
-        </div>
         <div class="bar-flex-row">
-          <label>File:</label>
-          <input v-model="destinationFilename" name="filename" type="text" class="bar-flex-row-content"></input>
-          <button v-on:click="selectFiles(false, true).then(function(filename) { destinationFilename = filename; })"><i class="fas fa-file"></i></button>
+          <button v-on:click="pages.navigateBack()"><i class="fas fa-arrow-left"></i></button>
+          <span class="bar-flex-row-content"></span>
+          <button v-on:click="pages.navigateTo('console')" title="Show output"><i class="fas fa-terminal"></i></button>
         </div>
-        <div class="button-bar">
-          <button v-bind:disabled="exportId || parts.length === 0" v-on:click="startExport()"><i class="fas fa-cogs"></i> Export</button>
-          <button v-bind:disabled="!exportId" v-on:click="pages.navigateTo('console')"><i class="fas fa-terminal"></i></button>
+        <h2>Export</h2>
+        <div v-if="!exportId">
+          <div class="input-bar">
+            <label>Format:</label>
+            <select v-model="exportFormat" title="Format">
+              <option value="-">disable</option>
+              <option value="dvd">MPEG-2 PS (DVD VOB)</option>
+              <option value="flv">FLV (Flash Video)</option>
+              <option value="gif">GIF Animation</option>
+              <option value="m4v">raw MPEG-4 video</option>
+              <option value="matroska">Matroska</option>
+              <option value="mjpeg">raw MJPEG video</option>
+              <option value="mov">QuickTime / MOV</option>
+              <option value="mp4">MP4 (MPEG-4 Part 14)</option>
+              <option value="mpeg">MPEG-1 Program Stream (mpeg)</option>
+              <option value="mpegts">MPEG-2 Transport Stream (mpegts)</option>
+              <option value="ogv">Ogg Video</option>
+              <option value="svcd">MPEG-2 PS (SVCD)</option>
+              <option value="vcd">MPEG-1 Program Stream (VCD)</option>
+              <option value="vob">MPEG-2 PS (VOB)</option>
+              <option value="webm">WebM</option>
+            </select>
+          </div>
+          <div class="input-bar">
+            <label>Video Codec:</label>
+            <select v-model="exportVideoCodec" title="Select Video Codec">
+              <option value="-">disable</option>
+              <option value="copy">copy</option>
+              <option value="dvvideo">DV (Digital Video)</option>
+              <option value="flv1">FLV / Sorenson Spark / Sorenson H.263 (Flash Video)</option>
+              <option value="gif">GIF (Graphics Interchange Format)</option>
+              <option value="h261">H.261</option>
+              <option value="h263">H.263 / H.263-1996, H.263+ / H.263-1998 / H.263 version 2</option>
+              <option value="h263p">H.263+ / H.263-1998 / H.263 version 2</option>
+              <option value="h264">H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10</option>
+              <option value="hevc">H.265 / HEVC (High Efficiency Video Coding)</option>
+              <option value="mjpeg">Motion JPEG</option>
+              <option value="mpeg1video">MPEG-1 video</option>
+              <option value="mpeg2video">MPEG-2 video</option>
+              <option value="mpeg4">MPEG-4 part 2</option>
+              <option value="msmpeg4v2">MPEG-4 part 2 Microsoft variant version 2</option>
+              <option value="msmpeg4v3">MPEG-4 part 2 Microsoft variant version 3</option>
+              <option value="msvideo1">Microsoft Video 1</option>
+              <option value="png">PNG (Portable Network Graphics) image</option>
+              <option value="rawvideo">raw video</option>
+              <option value="theora">Theora</option>
+              <option value="vp8">On2 VP8</option>
+              <option value="vp9">Google VP9</option>
+              <option value="wmv1">Windows Media Video 7</option>
+              <option value="wmv2">Windows Media Video 8</option>
+            </select>
+          </div>
+          <div class="input-bar">
+            <label>Audio Codec:</label>
+            <select v-model="exportAudioCodec" title="Select Audio Codec">
+              <option value="-">disable</option>
+              <option value="copy">copy</option>
+              <option value="aac">AAC (Advanced Audio Coding) (encoders: aac libvo_aacenc )</option>
+              <option value="ac3">ATSC A/52A (AC-3) (encoders: ac3 ac3_fixed )</option>
+              <option value="alac">ALAC (Apple Lossless Audio Codec)</option>
+              <option value="dts">DCA (DTS Coherent Acoustics) (decoders: dca ) (encoders: dca )</option>
+              <option value="eac3">ATSC A/52B (AC-3, E-AC-3)</option>
+              <option value="flac">FLAC (Free Lossless Audio Codec)</option>
+              <option value="mp2">MP2 (MPEG audio layer 2) (decoders: mp2 mp2float ) (encoders: mp2 libtwolame )</option>
+              <option value="mp3">MP3 (MPEG audio layer 3) (decoders: mp3 mp3float ) (encoders: libmp3lame )</option>
+              <option value="vorbis">Vorbis (decoders: vorbis libvorbis ) (encoders: vorbis libvorbis )</option>
+              <option value="wmav1">Windows Media Audio 1</option>
+              <option value="wmav2">Windows Media Audio 2</option>
+            </select>
+          </div>
+          <div class="input-bar">
+            <input type="checkbox" v-model="exportEnableSubtitle" />
+            <label>Enable Subtitle</label>
+          </div>
+          <br />
+          <div class="bar-flex-row">
+            <label>File:</label>
+            <input v-model="destinationFilename" name="filename" type="text" class="bar-flex-row-content"></input>
+            <button v-on:click="selectFiles(false, true).then(function(filename) { destinationFilename = filename; })"><i class="fas fa-file"></i></button>
+          </div>
+          <br />
+          <div class="button-bar">
+            <button v-bind:disabled="parts.length === 0" v-on:click="startExport()"><i class="fas fa-cogs"></i> Export</button>
+          </div>
+        </div>
+        <div v-if="exportId">
+          <p>Exported time: {{ formatHMS(Math.floor(logTime)) }}</p>
+          <p>Total time: {{ formatHMS(Math.floor(logDuration)) }}</p>
+          <p v-if="logPartIndex <= logPartCount">Part: {{ '' + logPartIndex + ' / ' + logPartCount }}</p>
+          <p v-else>Concat parts</p>
+          <div class="button-bar">
+            <progress style="width: 80%; height: 2rem;" max="1000" v-bind:value="logPermil"></progress>
+            <br /><br />
+            <button v-on:click="stopExport()" title="Cancel export"><i class="fas fa-ban"></i> Cancel</button>
+          </div>
         </div>
       </div>
     </page>
     <page name="console">
       <div class="bar-flex-row">
         <button v-on:click="pages.navigateBack()"><i class="fas fa-arrow-left"></i></button>
-        <span class="bar-flex-row-content"></span>
-        <button v-on:click="stopExport()" title="Stop export"><i class="fas fa-times"></i></button>
-    </div>
+      </div>
       <div class="console">
         <pre>{{ logBuffer }}</pre>
         <pre>{{ logLine }}</pre>
+      </div>
+    </page>
+    <page name="missingConfig">
+      <div class="padded">
+        <div class="bar-flex-row">
+          <span class="bar-flex-row-content"></span>
+          <button v-on:click="pages.navigateTo('about')"><i class="fas fa-question"></i></button>
+        </div>
+        <h2>Missing Configuration</h2>
+        <p>It seems that some configuration is missing or invalid.</p>
+        <p>Check that you provided the correct location for ffmpeg and ffprobe.</p>
+        <p>You could download FFmpeg binaries on the <a href="https://www.ffmpeg.org/download.html" target="_blank">FFmpeg site</a>.</li>
       </div>
     </page>
     <page name="about">
@@ -223,6 +262,7 @@
           <li><a href="https://github.com/taylorhakes/promise-polyfill" target="_blank">promise</a> is licensed under the MIT license</li>
           <li><a href="https://fontawesome.com/license/free" target="_blank">Font Awesome</a> is licensed under MIT, SIL OFL, and CC BY licenses</li>
         </ul>
+        <p>Your user agent is "{{ window.navigator.userAgent }}"</p>
       </div>
     </page>
   </div>

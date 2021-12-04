@@ -8,18 +8,13 @@ local strings = require('jls.util.strings')
 local TableList = require('jls.util.TableList')
 local LocalDateTime = require('jls.util.LocalDateTime')
 
+local ExecWorker = require('ExecWorker')
+
 local function getExecutableName(name)
   if system.isWindows() then
     return name..'.exe'
   end
   return name
-end
-
-local function getUserDir()
-  if system.isWindows() then
-    return os.getenv('TEMP') or os.getenv('USERPROFILE')
-  end
-  return os.getenv('HOME')
 end
 
 local function hash(value)
@@ -29,7 +24,7 @@ end
 local function computeFileId(file)
   return ''
   ..strings.formatInteger(hash(file:getName()), 64)
-  --..strings.formatInteger(hash(file:getParent()) % MAX_ID_PART, 64)
+  --..strings.formatInteger(hash(file:getParent()), 64)
   ..strings.formatInteger(file:lastModified(), 64)
   ..strings.formatInteger(file:length(), 64)
 end
@@ -37,21 +32,13 @@ end
 
 return class.create(function(ffmpeg)
 
-  function ffmpeg:initialize(options, execWorker)
-    local cacheDir = File:new(options.cache)
-    if not cacheDir:isAbsolute() then
-      local homeDir = File:new(getUserDir() or '.')
-      if not homeDir:isDirectory() then
-        error('Invalid user directory, '..homeDir:getPath())
-      end
-      cacheDir = File:new(homeDir, options.cache):getAbsoluteFile()
-    end
-    if not cacheDir:isDirectory() then
-      if not cacheDir:mkdir() then
-        error('Cannot create cache directory, '..cacheDir:getPath())
-      end
-    end
+  function ffmpeg:initialize(cacheDir)
     self.cacheDir = cacheDir
+    self.sources = {}
+    self.execWorker = ExecWorker:new()
+  end
+
+  function ffmpeg:configure(options)
     self.ffmpegPath = options.ffmpeg
     if options.ffprobe then
       self.ffprobePath = options.ffprobe
@@ -63,26 +50,22 @@ return class.create(function(ffmpeg)
         self.ffprobePath = getExecutableName('ffprobe')
       end
     end
-    self.sources = {}
-    self.execWorker = execWorker
+  end
+
+  function ffmpeg:close()
+    self.execWorker:close()
   end
 
   function ffmpeg:check()
     local ffmpegFile = File:new(self.ffmpegPath)
     if not ffmpegFile:exists() then
-      error('ffmpeg not found, '..ffmpegFile:getPath())
+      return nil, 'ffmpeg not found, '..ffmpegFile:getPath()
     end
     local ffprobeFile = File:new(self.ffprobePath)
     if not ffprobeFile:exists() then
-      error('ffprobe not found, '..ffprobeFile:getPath())
+      return nil, 'ffprobe not found, '..ffprobeFile:getPath()
     end
-  end
-
-  function ffmpeg:getCacheDir()
-    return self.cacheDir
-  end
-
-  function ffmpeg:prepare()
+    return true
   end
 
   local function formatTime(v, showMs)
@@ -182,33 +165,21 @@ return class.create(function(ffmpeg)
   function ffmpeg:createCommands(filename, parts, destOptions, seekDelayMs)
     local commands = {}
     if #parts == 1 then
-      table.insert(commands, {
-        line = self:createCommand(parts[1], filename, destOptions, seekDelayMs),
-        name = 'Processing "'..filename..'"',
-        showStandardError = true
-      })
+      table.insert(commands, self:createCommand(parts[1], filename, destOptions, seekDelayMs))
     elseif #parts > 1 then
       local concatScript = StringBuffer:new()
       concatScript:append('# fcut')
       for i, part in ipairs(parts) do
         local partName = 'part_'..tostring(i)..'.tmp'
         local outFilename = self:createTempFile(partName):getPath()
-        table.insert(commands, {
-          line = self:createCommand(part, outFilename, destOptions, seekDelayMs),
-          name = 'Processing part '..tostring(i)..'/'..tostring(#parts),
-          showStandardError = true
-        })
+        table.insert(commands, self:createCommand(part, outFilename, destOptions, seekDelayMs))
         local concatPartname = string.gsub(outFilename, '[\\+]', '/')
         --local concatPartname = partName -- to be safe
         concatScript:append('\nfile ', concatPartname)
       end
       local concatFile = self:createTempFile('concat.txt');
       concatFile:write(concatScript:toString());
-      table.insert(commands, {
-        line = self:computeArguments(filename, {'-c', 'copy'}, concatFile:getPath(), {'-f', 'concat', '-safe', '0'}),
-        name = 'Concat "'..filename..'"',
-        showStandardError = true
-      })
+      table.insert(commands, self:computeArguments(filename, {'-c', 'copy'}, concatFile:getPath(), {'-f', 'concat', '-safe', '0'}))
     end
     return commands
   end

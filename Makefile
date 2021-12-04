@@ -1,6 +1,8 @@
 
 UNAME_S := $(shell uname -s)
+UNAME_M := $(shell uname -m)
 MK_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
+
 ARCH = x86_64
 
 ifeq ($(UNAME_S),Linux)
@@ -36,7 +38,14 @@ ifeq (,$(findstring x86_64,$(GCC_NAME)))
   WEBVIEW_ARCH = x86
 endif
 
-main: dist
+main: dist-archive
+
+show:
+	@echo ARCH: $(ARCH)
+	@echo PLAT: $(PLAT)
+	@echo DIST_SUFFIX: $(DIST_SUFFIX)
+	@echo UNAME_S: $(UNAME_S)
+	@echo UNAME_M: $(UNAME_M)
 
 dist-copy-linux:
 	-mkdir $(FCUT_DIST)/bin/socket
@@ -90,5 +99,10 @@ dist-archive: dist dist$(ZIP)
 
 dist-full-archive: dist-full dist$(ZIP)
 	mv $(FCUT_DIST)/fcut$(DIST_SUFFIX).zip $(FCUT_DIST)/fcut-ffmpeg$(DIST_SUFFIX).zip
+
+ffmpeg.zip:
+	cd ffmpeg && zip -r ../dist/ffmpeg-$(ARCH)-$(PLAT).zip *
+
+ffmpeg-archive: ffmpeg$(ZIP)
 
 .PHONY: dist

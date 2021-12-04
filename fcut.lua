@@ -1,7 +1,6 @@
 os.setlocale('') -- set native locale
 
 local system = require('jls.lang.system')
-local runtime = require('jls.lang.runtime')
 local Promise = require('jls.lang.Promise')
 local logger = require('jls.lang.logger')
 local event = require('jls.lang.event')
@@ -20,7 +19,14 @@ local WebSocketUpgradeHandler = require('jls.net.http.ws').WebSocketUpgradeHandl
 
 local FileChooser = require('FileChooser')
 local Ffmpeg = require('Ffmpeg')
-local ExecWorker = require('ExecWorker')
+local CONFIG_SCHEMA = require('fcutSchema')
+
+local function getUserDir()
+  if system.isWindows() then
+    return os.getenv('TEMP') or os.getenv('USERPROFILE')
+  end
+  return os.getenv('HOME')
+end
 
 local function processFile(file, processFn)
   if file:exists() then
@@ -35,81 +41,6 @@ local function processFile(file, processFn)
   end)
 end
 
-local CONFIG_SCHEMA = {
-  title = 'Fast Cut',
-  type = 'object',
-  additionalProperties = false,
-  properties = {
-    config = {
-      title = 'The configuration file',
-      type = 'string',
-      default = 'fcut.json',
-    },
-    cache = {
-      title = 'The cache path, relative to the user home',
-      type = 'string',
-      default = './.fcut_cache',
-    },
-    media = {
-      title = 'The media path, relative to the work directory',
-      type = 'string',
-      default = '.',
-    },
-    project = {
-      title = 'A project file to load',
-      type = 'string',
-    },
-    ffmpeg = {
-      title = 'The ffmpeg path',
-      type = 'string',
-      default = (system.isWindows() and 'ffmpeg\\ffmpeg.exe' or '/usr/bin/ffmpeg'),
-    },
-    ffprobe = {
-      title = 'The ffprobe path',
-      type = 'string',
-    },
-    loglevel = {
-      title = 'The log level',
-      type = 'string',
-      default = 'WARN',
-      enum = {'ERROR', 'WARN', 'INFO', 'CONFIG', 'FINE', 'FINER', 'FINEST', 'DEBUG', 'ALL'},
-    },
-    webview = {
-      type = 'object',
-      additionalProperties = false,
-      properties = {
-        debug = {
-          title = 'Enable WebView debug mode',
-          type = 'boolean',
-          default = false,
-        },
-        disable = {
-          title = 'Disable WebView',
-          type = 'boolean',
-          default = false,
-        },
-        ie = {
-          title = 'Enable IE',
-          type = 'boolean',
-          default = false,
-        },
-        address = {
-          title = 'The binding address',
-          type = 'string',
-          default = '::'
-        },
-        port = {
-          title = 'WebView HTTP server port',
-          type = 'integer',
-          default = 0,
-          minimum = 0,
-          maximum = 65535,
-        },
-      }
-    },
-  },
-}
-
 local config = tables.createArgumentTable(arg, {
   helpPath = 'help',
   configPath = 'config',
@@ -119,21 +50,26 @@ local config = tables.createArgumentTable(arg, {
 
 logger:setLevel(config.loglevel)
 
-local execWorker = ExecWorker:new()
-local ffmpeg = Ffmpeg:new(config, execWorker)
-
-local cacheDir = ffmpeg:getCacheDir()
+local cacheDir = File:new(config.cache)
+if not cacheDir:isAbsolute() then
+  local homeDir = File:new(getUserDir() or '.')
+  if not homeDir:isDirectory() then
+    error('Invalid user directory, '..homeDir:getPath())
+  end
+  cacheDir = File:new(homeDir, config.cache):getAbsoluteFile()
+end
+if not cacheDir:isDirectory() then
+  if not cacheDir:mkdir() then
+    error('Cannot create cache directory, '..cacheDir:getPath())
+  end
+end
 logger:info('Cache directory is '..cacheDir:getPath())
+
+local ffmpeg = Ffmpeg:new(cacheDir)
+ffmpeg:configure(config)
 
 local scriptFile = File:new(arg[0]):getAbsoluteFile()
 local scriptDir = scriptFile:getParentFile()
-
-local webSocket
-local function webSocketSend(line)
-  if webSocket and line then
-    webSocket:sendTextMessage(line)
-  end
-end
 
 if config.webview.ie then
   system.setenv('WEBVIEW2_WIN32_PATH', 'na')
@@ -181,6 +117,13 @@ local function createHttpContexts(httpServer)
     ['getSourceId?method=POST'] = function(exchange)
       local filename = exchange:getRequest():getBody()
       return ffmpeg:openSource(filename)
+    end,
+    ['checkFFmpeg?method=POST'] = function(exchange)
+      local status, reason = ffmpeg:check()
+      return {
+        status = status,
+        reason = reason,
+      }
     end,
     ['listFiles?method=POST'] = function(exchange)
       local path = exchange:getRequest():getBody()
@@ -242,20 +185,28 @@ local function createHttpContexts(httpServer)
         webSocket:close()
         return
       end
-      exportContext.index = 0
+      local commands = exportContext.commands
+      local header = {' -- export commands ------'};
+      for index, command in ipairs(commands) do
+        table.insert(header, '  '..tostring(index)..': '..table.concat(command, ' '))
+      end
+      table.insert(header, '')
+      webSocket:sendTextMessage(table.concat(header, '\n'))
       local function endExport(exitCode)
         exportContext.exitCode = exitCode
         webSocket:close()
         exportContexts[exportId] = nil
       end
+      local index = 0
       local function startNextCommand()
-        exportContext.index = exportContext.index + 1
-        if exportContext.index > #exportContext.commands then
+        index = index + 1
+        if index > #commands then
           endExport(0)
           return
         end
-        local command = exportContext.commands[exportContext.index]
-        local pb = ProcessBuilder:new(command.line)
+        local command = commands[index]
+        webSocket:sendTextMessage('\n -- starting command '..tostring(index)..'/'..tostring(#commands)..' ------\n\n')
+        local pb = ProcessBuilder:new(command)
         local p = Pipe:new()
         pb:redirectError(p)
         local ph = pb:start(function(exitCode)
@@ -281,6 +232,16 @@ local function createHttpContexts(httpServer)
   }))
 end
 
+local function terminate()
+  ffmpeg:close()
+  for _, exportContext in pairs(exportContexts) do
+    if exportContext and exportContext.process then
+      exportContext.process:destroy()
+    end
+  end
+  exportContexts = {}
+end
+
 if config.webview.disable then
   local httpServer = require('jls.net.http.HttpServer'):new()
   httpServer:bind(config.webview.address, config.webview.port):next(function()
@@ -288,6 +249,14 @@ if config.webview.disable then
     if config.webview.port == 0 then
       print('FCut HTTP Server available at http://localhost:'..tostring(select(2, httpServer:getAddress())))
     end
+    httpServer:createContext('/admin/(.*)', RestHttpHandler:new({
+      ['stop?method=POST'] = function(exchange)
+        logger:info('Closing HTTP server')
+        httpServer:close()
+        terminate()
+        --HttpExchange.ok(exchange, 'Closing')
+      end,
+    }))
   end, function(err)
     logger:warn('Cannot bind HTTP server due to '..tostring(err))
     os.exit(1)
@@ -309,13 +278,10 @@ else
     return webview:getThread():ended()
   end):next(function()
     logger:info('WebView closed')
-  end):catch(function(err)
-    logger:warn('Cannot open webview due to '..tostring(err))
-  end):next(function()
-    execWorker:close()
-    if webSocket then
-      webSocket:close()
-    end
+  end, function(reason)
+    logger:warn('Cannot open webview due to '..tostring(reason))
+  end):finally(function()
+    terminate()
   end)
 end
 

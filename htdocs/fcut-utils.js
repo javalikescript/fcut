@@ -22,7 +22,7 @@ function pad(n) {
 }
 
 function formatHMS(time, long) {
-  var seconds = Math.floor(time) % 60;
+  var seconds = (Math.floor(time * 1000) / 1000) % 60;
   var minutes = Math.floor(time / 60) % 60;
   var hours = Math.floor(time / 3600);
   if ((hours === 0) && !long) {
@@ -33,7 +33,7 @@ function formatHMS(time, long) {
 
 function parseHMS(value) {
   var parts = value.split(':').reverse().map(function(part) {
-    return parseInt(part, 10);
+    return parseFloat(part);
   });
   var seconds = parts[0] || 0;
   var minutes = parts[1] || 0;
@@ -107,10 +107,11 @@ function onFileChoosed(names) {
   }
 }
 
-function chooseFiles(fileChooser, multiple, save, path) {
+function chooseFiles(fileChooser, multiple, save, path, extention) {
   fileChooser.multiple = multiple === true;
   fileChooser.save = save === true;
   fileChooser.label = save ? 'Save' : 'Open';
+  fileChooser.extention = extention || '';
   if (path) {
     fileChooser.list(path);
   } else {
