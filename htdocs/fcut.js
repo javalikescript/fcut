@@ -356,7 +356,6 @@ var vm = new Vue({
         parts: this.parts,
         options: options
       };
-      this.exportId = true;
       this.logBuffer = '';
       this.logLine = '';
       this.logCR = false;
