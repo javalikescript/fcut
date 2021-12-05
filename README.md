@@ -30,7 +30,14 @@ Fast Cut provides:
 ## What does it look like?
 
 <div align="center">
-<img src="https://github.com/javalikescript/fcut/raw/main/screenshot.jpg" />
+<img src="https://javalikescript.github.io/fcut/screenshot-linux.jpg" />
+<br />
+<img src="https://javalikescript.github.io/fcut/screenshot-windows.jpg" />
+<br />
+<video controls>
+  <source src="https://javalikescript.github.io/fcut/fcut-sample.mp4" type="video/mp4">
+  <p>Sorry, your browser doesn't support embedded videos, click <a href="https://javalikescript.github.io/fcut/fcut-sample.mp4">the link to download</a>.</p>
+</video>
 </div>
 
 ## How to install it?
