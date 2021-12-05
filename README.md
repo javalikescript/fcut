@@ -29,16 +29,14 @@ Fast Cut provides:
 
 ## What does it look like?
 
-<div align="center">
-<img src="https://javalikescript.github.io/fcut/screenshot-linux.jpg" />
-<br />
-<img src="https://javalikescript.github.io/fcut/screenshot-windows.jpg" />
-<br />
-<video controls>
-  <source src="https://javalikescript.github.io/fcut/fcut-sample.mp4" type="video/mp4">
-  <p>Sorry, your browser doesn't support embedded videos, click <a href="https://javalikescript.github.io/fcut/fcut-sample.mp4">the link to download</a>.</p>
-</video>
-</div>
+![screenshot-windows](https://user-images.githubusercontent.com/9386420/144749617-b4d8ef5b-3957-4409-a090-d71b73654b2e.jpg)
+
+
+![screenshot-linux](https://user-images.githubusercontent.com/9386420/144749623-427bf569-8fdb-4c57-9673-4b89a02dbf09.jpg)
+
+
+https://user-images.githubusercontent.com/9386420/144749626-fd66a1c7-0c76-4cbc-80d1-9242f5c8f487.mp4
+
 
 ## How to install it?
 
