@@ -48,8 +48,7 @@ show:
 	@echo UNAME_M: $(UNAME_M)
 
 dist-copy-linux:
-	-mkdir $(FCUT_DIST)/bin/socket
-	-cp -u $(LUACLIBS)/socket/core.$(SO) $(FCUT_DIST)/bin/socket/
+	-cp -u $(LUACLIBS)/linux.$(SO) $(FCUT_DIST)/bin/
 	cp -u fcut.sh $(FCUT_DIST)/
 
 dist-copy-windows:
