@@ -62,7 +62,7 @@ var vm = new Vue({
     },
     addSources: function(beforeIndex) {
       var that = this;
-      return this.selectFiles(true, false, '.m2ts').then(function(filenames) {
+      return this.selectFiles(true, false, this.config.mediaFilter).then(function(filenames) {
         return Promise.all(filenames.map(function(filename) {
           return that.openSource(filename, beforeIndex).then(function(sourceId) {
             that.addSource(sourceId, beforeIndex);
@@ -167,9 +167,10 @@ var vm = new Vue({
     navigateOnClick: function(event, targetId) {
       var target = targetId ? document.getElementById(targetId) : event.target;
       var rect = target.getBoundingClientRect();
-      var x = event.clientX - rect.left;
       var m = rect.width / 100;
-      var t = Math.floor(this.duration * (x - m) / (rect.width - m * 2));
+      var x = event.clientX - rect.left - m;
+      var w = rect.width - m * 2;
+      var t = Math.floor(this.duration * x / w);
       this.navigateTo(t);
     },
     findPartAndTime: function(time) {
