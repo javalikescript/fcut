@@ -18,9 +18,21 @@ return {
       type = 'string',
       default = '.',
     },
+    mediaFilter = {
+      title = 'The media file filter',
+      type = 'string',
+      default = '.m2ts',
+    },
     project = {
       title = 'A project file to load',
       type = 'string',
+    },
+    processCount = {
+      title = 'The maximum number of running processes',
+      type = 'integer',
+      default = 2,
+      minimum = 1,
+      maximum = 32,
     },
     ffmpeg = {
       title = 'The ffmpeg path',

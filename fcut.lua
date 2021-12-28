@@ -7,9 +7,11 @@ local event = require('jls.lang.event')
 local ProcessBuilder = require('jls.lang.ProcessBuilder')
 local Pipe = require('jls.io.Pipe')
 local File = require('jls.io.File')
+local FileDescriptor = require('jls.io.FileDescriptor')
 local tables = require('jls.util.tables')
 local strings = require('jls.util.strings')
 local Map = require('jls.util.Map')
+local List = require('jls.util.List')
 local HttpExchange = require('jls.net.http.HttpExchange')
 local FileHttpHandler = require('jls.net.http.handler.FileHttpHandler')
 local RestHttpHandler = require('jls.net.http.handler.RestHttpHandler')
@@ -39,6 +41,26 @@ local function processFile(file, processFn)
     tmpFile:delete()
     return Promise.reject(reason)
   end)
+end
+
+local function startProcess(command, outputFile, callback)
+  local pb = ProcessBuilder:new(command)
+  local fd
+  if outputFile then
+    fd = FileDescriptor.openSync(outputFile, 'w')
+    pb:redirectOutput(fd)
+  end
+  local ph = pb:start(function(exitCode)
+    if fd then
+      fd:close()
+    end
+    if exitCode == 0 then
+      callback()
+    else
+      callback('The process fails with code '..tostring(exitCode))
+    end
+  end)
+  return ph
 end
 
 local config = tables.createArgumentTable(arg, {
@@ -84,6 +106,48 @@ elseif assetsZip:isFile() then
   assetsHandler = ZipFileHttpHandler:new(assetsZip)
 end
 
+local commandQueue = {}
+local commandCount = 0
+local processList = {}
+
+local function wakeupCommandQueue()
+  if commandCount < config.processCount then
+    local command = table.remove(commandQueue, 1)
+    if command then
+      commandCount = commandCount + 1
+      local ph
+      ph = startProcess(command.args, command.outputFile, function(...)
+        commandCount = commandCount - 1
+        List.removeAll(processList, ph)
+        command.callback(...)
+        wakeupCommandQueue()
+      end)
+      table.insert(processList, ph)
+    end
+  end
+end
+
+local function enqueueCommand(args, id, outputFile)
+  local promise, callback = Promise.createWithCallback()
+  if id then
+    List.removeIf(commandQueue, function(c)
+      if c.id == id then
+        c.callback('Cancelled')
+        return true
+      end
+      return false
+    end)
+  end
+  table.insert(commandQueue, {
+    args = args,
+    outputFile = outputFile,
+    callback = callback,
+    id = id,
+  })
+  wakeupCommandQueue()
+  return promise
+end
+
 local exportContexts = {}
 
 local function createHttpContexts(httpServer)
@@ -98,7 +162,8 @@ local function createHttpContexts(httpServer)
     prepareFile = function(_, exchange, file)
       local id, sec = exchange:getRequestArguments()
       return processFile(file, function(tmpFile)
-        return ffmpeg:extractPreviewAt(id, tonumber(sec), tmpFile)
+        local command = ffmpeg:createPreviewAtCommand(id, tonumber(sec), tmpFile)
+        return enqueueCommand(command, 'preview')
       end)
     end
   }))
@@ -109,7 +174,8 @@ local function createHttpContexts(httpServer)
     prepareFile = function(_, exchange, file)
       local id = exchange:getRequestArguments()
       return processFile(file, function(tmpFile)
-        return ffmpeg:extractInfo(id, tmpFile)
+        local command = ffmpeg:createProbeCommand(id)
+        return enqueueCommand(command, nil, tmpFile)
       end)
     end
   }))
@@ -218,9 +284,7 @@ local function createHttpContexts(httpServer)
         end)
         exportContext.process = ph
         p:readStart(function(err, data)
-          if err then
-            p:close()
-          elseif data then
+          if not err and data then
             webSocket:sendTextMessage(data)
           else
             p:close()
@@ -233,7 +297,10 @@ local function createHttpContexts(httpServer)
 end
 
 local function terminate()
-  ffmpeg:close()
+  for _, ph in ipairs(processList) do
+    ph:destroy()
+  end
+  processList = {}
   for _, exportContext in pairs(exportContexts) do
     if exportContext and exportContext.process then
       exportContext.process:destroy()

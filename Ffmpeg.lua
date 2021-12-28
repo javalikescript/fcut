@@ -1,14 +1,11 @@
 local class = require('jls.lang.class')
 local system = require('jls.lang.system')
-local runtime = require('jls.lang.runtime')
 local Promise = require('jls.lang.Promise')
 local StringBuffer = require('jls.lang.StringBuffer')
 local File = require('jls.io.File')
 local strings = require('jls.util.strings')
 local TableList = require('jls.util.TableList')
 local LocalDateTime = require('jls.util.LocalDateTime')
-
-local ExecWorker = require('ExecWorker')
 
 local function getExecutableName(name)
   if system.isWindows() then
@@ -35,7 +32,6 @@ return class.create(function(ffmpeg)
   function ffmpeg:initialize(cacheDir)
     self.cacheDir = cacheDir
     self.sources = {}
-    self.execWorker = ExecWorker:new()
   end
 
   function ffmpeg:configure(options)
@@ -50,10 +46,6 @@ return class.create(function(ffmpeg)
         self.ffprobePath = getExecutableName('ffprobe')
       end
     end
-  end
-
-  function ffmpeg:close()
-    self.execWorker:close()
   end
 
   function ffmpeg:check()
@@ -204,18 +196,15 @@ return class.create(function(ffmpeg)
     end)
   end
 
-  function ffmpeg:extractInfo(id, file)
+  function ffmpeg:createProbeCommand(id)
     local sourceFile = self.sources[id]
     if not sourceFile then
       Promise.reject('Unknown source id "'..id..'"');
     end
-    local args = {self.ffprobePath, '-hide_banner', '-v', '0', '-show_format', '-show_streams', '-of', 'json', sourceFile:getPath(), '>', file:getPath()}
-    local line = runtime.formatCommandLine(args)
-    --logger:fine('extractInfo execute ->'..line..'<-')
-    return self.execWorker:execute(line)
+    return {self.ffprobePath, '-hide_banner', '-v', '0', '-show_format', '-show_streams', '-of', 'json', sourceFile:getPath()}
   end
 
-  function ffmpeg:extractPreviewAt(id, sec, file, width, height)
+  function ffmpeg:createPreviewAtCommand(id, sec, file, width, height)
     local sourceFile = self.sources[id]
     if not sourceFile then
       Promise.reject('Unknown source id "'..id..'"');
@@ -226,9 +215,7 @@ return class.create(function(ffmpeg)
       TableList.concat(args, '-s', tostring(width)..'x'..tostring(height))
     end
     TableList.concat(args, '-y', file:getPath())
-    local line = runtime.formatCommandLine(args)
-    --logger:fine('extractPreviewAt execute ->'..line..'<-')
-    return self.execWorker:execute(line, 'preview')
+    return args
   end
 
 end)
