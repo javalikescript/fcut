@@ -3,6 +3,7 @@ os.setlocale('') -- set native locale
 local system = require('jls.lang.system')
 local Promise = require('jls.lang.Promise')
 local logger = require('jls.lang.logger')
+local loader = require('jls.lang.loader')
 local event = require('jls.lang.event')
 local ProcessBuilder = require('jls.lang.ProcessBuilder')
 local Pipe = require('jls.io.Pipe')
@@ -95,6 +96,10 @@ local scriptDir = scriptFile:getParentFile()
 
 if config.webview.ie then
   system.setenv('WEBVIEW2_WIN32_PATH', 'na')
+end
+
+if config.webview.native and config.webview.disable or not loader.tryRequire('win32') then
+  config.webview.native = false
 end
 
 local assetsHandler
@@ -296,6 +301,8 @@ local function createHttpContexts(httpServer)
   }))
 end
 
+local serialWorker
+
 local function terminate()
   for _, ph in ipairs(processList) do
     ph:destroy()
@@ -307,6 +314,10 @@ local function terminate()
     end
   end
   exportContexts = {}
+  if serialWorker then
+    serialWorker:close()
+    serialWorker = nil
+  end
 end
 
 if config.webview.disable then
@@ -341,7 +352,37 @@ else
       ['fullscreen(requestJson)?method=POST&Content-Type=application/json'] = function(exchange, fullscreen)
         webview:fullscreen(fullscreen == true);
       end,
+      ['selectFiles(requestJson)?method=POST&Content-Type=application/json'] = function(exchange, obj)
+        if serialWorker then
+          return serialWorker:process(obj)
+        end
+        HttpExchange.notFound(exchange, 'Not available')
+        return false
+      end,
     }))
+    if config.webview.native then
+      serialWorker = require('SerialWorker'):new(function()
+        local win32 = require('win32')
+        win32.SetWindowOwner();
+        return function(message)
+          if message then
+            if message.save then
+              return {win32.GetSaveFileName()}
+            end
+            local names = table.pack(win32.GetOpenFileName(message.multiple))
+            local dir = table.remove(names, 1)
+            if #names == 0 then
+              return {dir}
+            end
+            local filenames = {}
+            for _, name in ipairs(names) do
+              table.insert(filenames, dir..'\\'..name)
+            end
+            return filenames
+          end
+        end
+      end)
+    end
     return webview:getThread():ended()
   end):next(function()
     logger:info('WebView closed')

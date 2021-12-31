@@ -58,11 +58,32 @@ var vm = new Vue({
     selectFiles: function(multiple, save, extention) {
       var path = this.keepFileChooserPath ? undefined : this.config.media;
       this.keepFileChooserPath = true;
+      if (this.config.webview.native) {
+        return fetch('webview/selectFiles', {
+          method: 'POST',
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            path: path,
+            multiple: multiple,
+            save: save,
+            extention: extention
+          })
+        }).then(function(response) {
+          return response.json();
+        }).then(function(filenames) {
+          if (multiple) {
+            return filenames;
+          }
+          return filenames[0];
+        });
+      }
       return chooseFiles(this.$refs.fileChooser, multiple, save, path, extention);
     },
     addSources: function(beforeIndex) {
       var that = this;
-      return this.selectFiles(true, false, this.config.mediaFilter).then(function(filenames) {
+      return that.selectFiles(true, false, that.config.mediaFilter).then(function(filenames) {
         return Promise.all(filenames.map(function(filename) {
           return that.openSource(filename, beforeIndex).then(function(sourceId) {
             that.addSource(sourceId, beforeIndex);

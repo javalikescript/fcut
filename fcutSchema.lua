@@ -80,6 +80,11 @@ return {
           minimum = 0,
           maximum = 65535,
         },
+        native = {
+          title = 'Enable native open file dialog',
+          type = 'boolean',
+          default = true,
+        },
       }
     },
   },
