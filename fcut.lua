@@ -44,8 +44,15 @@ local function processFile(file, processFn)
   end)
 end
 
+local function createProcessBuilder(...)
+  local pb = ProcessBuilder:new(...)
+  -- hide the subprocess console window that would normally be created
+  pb.hide = true
+  return pb
+end
+
 local function startProcess(command, outputFile, callback)
-  local pb = ProcessBuilder:new(command)
+  local pb = createProcessBuilder(command)
   local fd
   if outputFile then
     fd = FileDescriptor.openSync(outputFile, 'w')
@@ -277,7 +284,7 @@ local function createHttpContexts(httpServer)
         end
         local command = commands[index]
         webSocket:sendTextMessage('\n -- starting command '..tostring(index)..'/'..tostring(#commands)..' ------\n\n')
-        local pb = ProcessBuilder:new(command)
+        local pb = createProcessBuilder(command)
         local p = Pipe:new()
         pb:redirectError(p)
         local ph = pb:start(function(exitCode)
