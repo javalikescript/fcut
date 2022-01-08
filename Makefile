@@ -55,6 +55,7 @@ dist-copy-windows:
 	-cp -u $(LUACLIBS)/winapi.$(SO) $(FCUT_DIST)/bin/
 	-cp -u $(LUACLIBS)/win32.$(SO) $(FCUT_DIST)/bin/
 	cp -u $(LUACLIBS)/lua*.$(SO) $(FCUT_DIST)/bin/
+	-cp -u $(LUACLIBS)/wlua$(EXE) $(FCUT_DIST)/bin/
 	cp -u $(LUACLIBS)/WebView2Loader.dll $(FCUT_DIST)/bin/
 	cp -u fcut.bat $(FCUT_DIST)/
 
