@@ -14,6 +14,8 @@ endif
 
 LUACLIBS := ../luaclibs/dist-$(PLAT)
 FCUT_DIST := dist
+FCUT_DIST_CLUA := $(FCUT_DIST)/bin
+FCUT_DIST_LUA := $(FCUT_DIST)/lua
 
 SO_windows=dll
 EXE_windows=.exe
@@ -48,29 +50,29 @@ show:
 	@echo UNAME_M: $(UNAME_M)
 
 dist-copy-linux:
-	-cp -u $(LUACLIBS)/linux.$(SO) $(FCUT_DIST)/bin/
+	-cp -u $(LUACLIBS)/linux.$(SO) $(FCUT_DIST_CLUA)/
 	cp -u fcut.sh $(FCUT_DIST)/
 
 dist-copy-windows:
-	-cp -u $(LUACLIBS)/winapi.$(SO) $(FCUT_DIST)/bin/
-	-cp -u $(LUACLIBS)/win32.$(SO) $(FCUT_DIST)/bin/
-	cp -u $(LUACLIBS)/lua*.$(SO) $(FCUT_DIST)/bin/
-	-cp -u $(LUACLIBS)/wlua$(EXE) $(FCUT_DIST)/bin/
-	cp -u $(LUACLIBS)/WebView2Loader.dll $(FCUT_DIST)/bin/
+	-cp -u $(LUACLIBS)/winapi.$(SO) $(FCUT_DIST_CLUA)/
+	-cp -u $(LUACLIBS)/win32.$(SO) $(FCUT_DIST_CLUA)/
+	cp -u $(LUACLIBS)/lua*.$(SO) $(FCUT_DIST_CLUA)/
+	-cp -u $(LUACLIBS)/wlua$(EXE) $(FCUT_DIST_CLUA)/
+	cp -u $(LUACLIBS)/WebView2Loader.dll $(FCUT_DIST_CLUA)/
 	cp -u fcut.bat $(FCUT_DIST)/
 
 dist-copy: dist-copy-$(PLAT)
-	cp -u $(LUACLIBS)/lua$(EXE) $(FCUT_DIST)/bin/
-	cp -u $(LUACLIBS)/cjson.$(SO) $(FCUT_DIST)/bin/
-	cp -u $(LUACLIBS)/luv.$(SO) $(FCUT_DIST)/bin/
-	cp -u $(LUACLIBS)/zlib.$(SO) $(FCUT_DIST)/bin/
-	cp -u $(LUACLIBS)/webview.$(SO) $(FCUT_DIST)/bin/
-	cp -ru $(LUACLIBS)/sha1/ $(FCUT_DIST)/lua/
-	cp -u $(LUACLIBS)/XmlParser.lua $(FCUT_DIST)/lua/
-	cp -u $(LUACLIBS)/sha1.lua $(FCUT_DIST)/lua/
-	cp -ru $(LUACLIBS)/jls/ $(FCUT_DIST)/lua/
-	cp -u *.lua $(FCUT_DIST)/lua/
-	mv $(FCUT_DIST)/lua/fcut.lua $(FCUT_DIST)/
+	cp -u $(LUACLIBS)/lua$(EXE) $(FCUT_DIST_CLUA)/
+	cp -u $(LUACLIBS)/cjson.$(SO) $(FCUT_DIST_CLUA)/
+	cp -u $(LUACLIBS)/luv.$(SO) $(FCUT_DIST_CLUA)/
+	cp -u $(LUACLIBS)/zlib.$(SO) $(FCUT_DIST_CLUA)/
+	cp -u $(LUACLIBS)/webview.$(SO) $(FCUT_DIST_CLUA)/
+	cp -ru $(LUACLIBS)/sha1/ $(FCUT_DIST_LUA)/
+	cp -u $(LUACLIBS)/XmlParser.lua $(FCUT_DIST_LUA)/
+	cp -u $(LUACLIBS)/sha1.lua $(FCUT_DIST_LUA)/
+	cp -ru $(LUACLIBS)/jls/ $(FCUT_DIST_LUA)/
+	cp -u *.lua $(FCUT_DIST_LUA)/
+	mv $(FCUT_DIST_LUA)/fcut.lua $(FCUT_DIST)/
 	cp -ru htdocs/ $(FCUT_DIST)/
 	-rm -f assets.tmp.zip
 	cd assets/ && zip -r ../assets.tmp.zip *
@@ -81,8 +83,8 @@ dist-clean:
 
 dist-prepare:
 	-mkdir $(FCUT_DIST)
-	mkdir $(FCUT_DIST)/bin
-	mkdir $(FCUT_DIST)/lua
+	mkdir $(FCUT_DIST_CLUA)
+	mkdir $(FCUT_DIST_LUA)
 
 dist: dist-clean dist-prepare dist-copy
 

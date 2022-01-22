@@ -63,11 +63,6 @@ return {
           type = 'boolean',
           default = false,
         },
-        ie = {
-          title = 'Enable IE',
-          type = 'boolean',
-          default = false,
-        },
         address = {
           title = 'The binding address',
           type = 'string',

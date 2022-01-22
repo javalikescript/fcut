@@ -20,9 +20,13 @@ local ZipFileHttpHandler = require('jls.net.http.handler.ZipFileHttpHandler')
 local TableHttpHandler = require('jls.net.http.handler.TableHttpHandler')
 local WebSocketUpgradeHandler = require('jls.net.http.ws').WebSocketUpgradeHandler
 
+-- Project required modules
+
 local FileChooser = require('FileChooser')
 local Ffmpeg = require('Ffmpeg')
 local CONFIG_SCHEMA = require('fcutSchema')
+
+-- Helper functions
 
 local function getUserDir()
   if system.isWindows() then
@@ -58,7 +62,8 @@ local function startProcess(command, outputFile, callback)
     fd = FileDescriptor.openSync(outputFile, 'w')
     pb:redirectOutput(fd)
   end
-  local ph = pb:start(function(exitCode)
+  local ph = pb:start()
+  ph:ended():next(function(exitCode)
     if fd then
       fd:close()
     end
@@ -71,6 +76,7 @@ local function startProcess(command, outputFile, callback)
   return ph
 end
 
+-- Extracts configuration from command line arguments
 local config = tables.createArgumentTable(arg, {
   helpPath = 'help',
   configPath = 'config',
@@ -78,8 +84,35 @@ local config = tables.createArgumentTable(arg, {
   schema = CONFIG_SCHEMA
 });
 
+-- Apply configured log level
 logger:setLevel(config.loglevel)
 
+-- Disable native open file dialog if necessary
+if config.webview.native and config.webview.disable or not loader.tryRequire('win32') then
+  config.webview.native = false
+end
+
+-- Application local variables
+
+local scriptFile = File:new(arg[0]):getAbsoluteFile()
+local scriptDir = scriptFile:getParentFile()
+
+local assetsHandler
+local assetsDir = File:new(scriptDir, 'assets')
+local assetsZip = File:new(scriptDir, 'assets.zip')
+if assetsDir:isDirectory() then
+  assetsHandler = FileHttpHandler:new(assetsDir)
+elseif assetsZip:isFile() then
+  assetsHandler = ZipFileHttpHandler:new(assetsZip)
+end
+
+local commandQueue = {}
+local commandCount = 0
+local processList = {}
+local exportContexts = {}
+local serialWorker
+
+-- Set up the cache directory
 local cacheDir = File:new(config.cache)
 if not cacheDir:isAbsolute() then
   local homeDir = File:new(getUserDir() or '.')
@@ -98,29 +131,24 @@ logger:info('Cache directory is '..cacheDir:getPath())
 local ffmpeg = Ffmpeg:new(cacheDir)
 ffmpeg:configure(config)
 
-local scriptFile = File:new(arg[0]):getAbsoluteFile()
-local scriptDir = scriptFile:getParentFile()
+-- Application local functions
 
-if config.webview.ie then
-  system.setenv('WEBVIEW2_WIN32_PATH', 'na')
+local function terminate()
+  for _, ph in ipairs(processList) do
+    ph:destroy()
+  end
+  processList = {}
+  for _, exportContext in pairs(exportContexts) do
+    if exportContext and exportContext.process then
+      exportContext.process:destroy()
+    end
+  end
+  exportContexts = {}
+  if serialWorker then
+    serialWorker:close()
+    serialWorker = nil
+  end
 end
-
-if config.webview.native and config.webview.disable or not loader.tryRequire('win32') then
-  config.webview.native = false
-end
-
-local assetsHandler
-local assetsDir = File:new(scriptDir, 'assets')
-local assetsZip = File:new(scriptDir, 'assets.zip')
-if assetsDir:isDirectory() then
-  assetsHandler = FileHttpHandler:new(assetsDir)
-elseif assetsZip:isFile() then
-  assetsHandler = ZipFileHttpHandler:new(assetsZip)
-end
-
-local commandQueue = {}
-local commandCount = 0
-local processList = {}
 
 local function wakeupCommandQueue()
   if commandCount < config.processCount then
@@ -160,13 +188,13 @@ local function enqueueCommand(args, id, outputFile)
   return promise
 end
 
-local exportContexts = {}
-
+-- Create the HTTP contexts used by the web application
 local function createHttpContexts(httpServer)
   logger:info('HTTP Server bound on port '..tostring(select(2, httpServer:getAddress())))
   httpServer:createContext('/(.*)', FileHttpHandler:new(File:new(scriptDir, 'htdocs'), nil, 'fcut.html'))
   httpServer:createContext('/config/(.*)', TableHttpHandler:new(config, nil, true))
   httpServer:createContext('/assets/(.*)', assetsHandler)
+  -- Context to retrieve and cache a movie image at a specific time
   httpServer:createContext('/source/([^/]+)/(%d+)%.jpg', Map.assign(FileHttpHandler:new(cacheDir), {
     getPath = function(_, exchange)
       return string.sub(exchange:getRequest():getTargetPath(), 9)
@@ -179,6 +207,7 @@ local function createHttpContexts(httpServer)
       end)
     end
   }))
+  -- Context to retrieve and cache a movie information
   httpServer:createContext('/source/([^/]+)/info%.json', Map.assign(FileHttpHandler:new(cacheDir), {
     getPath = function(_, exchange)
       return string.sub(exchange:getRequest():getTargetPath(), 9)
@@ -191,6 +220,7 @@ local function createHttpContexts(httpServer)
       end)
     end
   }))
+  -- Context for the application REST API
   httpServer:createContext('/rest/(.*)', RestHttpHandler:new({
     ['getSourceId?method=POST'] = function(exchange)
       local filename = exchange:getRequest():getBody()
@@ -255,6 +285,7 @@ local function createHttpContexts(httpServer)
       return exportId
     end,
   }))
+  -- Context that handle the export commands and output to a WebSocket
   httpServer:createContext('/console/(.*)', Map.assign(WebSocketUpgradeHandler:new(), {
     onOpen = function(_, webSocket, exchange)
       local exportId = exchange:getRequestArguments()
@@ -287,7 +318,8 @@ local function createHttpContexts(httpServer)
         local pb = createProcessBuilder(command)
         local p = Pipe:new()
         pb:redirectError(p)
-        local ph = pb:start(function(exitCode)
+        local ph = pb:start()
+        ph:ended():next(function(exitCode)
           if exitCode == 0 then
             startNextCommand()
           else
@@ -308,25 +340,7 @@ local function createHttpContexts(httpServer)
   }))
 end
 
-local serialWorker
-
-local function terminate()
-  for _, ph in ipairs(processList) do
-    ph:destroy()
-  end
-  processList = {}
-  for _, exportContext in pairs(exportContexts) do
-    if exportContext and exportContext.process then
-      exportContext.process:destroy()
-    end
-  end
-  exportContexts = {}
-  if serialWorker then
-    serialWorker:close()
-    serialWorker = nil
-  end
-end
-
+-- Start the application as an HTTP server or a WebView
 if config.webview.disable then
   local httpServer = require('jls.net.http.HttpServer'):new()
   httpServer:bind(config.webview.address, config.webview.port):next(function()
@@ -368,27 +382,32 @@ else
       end,
     }))
     if config.webview.native then
-      serialWorker = require('SerialWorker'):new(function()
+      serialWorker = require('jls.util.SerialWorker'):new()
+      serialWorker:call(function()
         local win32 = require('win32')
         win32.SetWindowOwner();
-        return function(message)
-          if message then
-            if message.save then
-              return {win32.GetSaveFileName()}
-            end
-            local names = table.pack(win32.GetOpenFileName(message.multiple))
-            local dir = table.remove(names, 1)
-            if #names == 0 then
-              return {dir}
-            end
-            local filenames = {}
-            for _, name in ipairs(names) do
-              table.insert(filenames, dir..'\\'..name)
-            end
-            return filenames
-          end
-        end
+        _G.win32 = win32
       end)
+      local function getFileName(message)
+        if message then
+          if message.save then
+            return {win32.GetSaveFileName()}
+          end
+          local names = table.pack(win32.GetOpenFileName(message.multiple))
+          local dir = table.remove(names, 1)
+          if #names == 0 then
+            return {dir}
+          end
+          local filenames = {}
+          for _, name in ipairs(names) do
+            table.insert(filenames, dir..'\\'..name)
+          end
+          return filenames
+        end
+      end
+      function serialWorker:process(order)
+        return self:call(getFileName, order)
+      end
     end
     return webview:getThread():ended()
   end):next(function()
@@ -400,4 +419,5 @@ else
   end)
 end
 
+-- Process events until the end
 event:loop()
