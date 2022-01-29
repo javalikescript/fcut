@@ -73,10 +73,13 @@ var vm = new Vue({
         }).then(function(response) {
           return response.json();
         }).then(function(filenames) {
-          if (multiple) {
-            return filenames;
+          if (filenames && (filenames.length > 0)) {
+            if (multiple) {
+              return filenames;
+            }
+            return filenames[0];
           }
-          return filenames[0];
+          return Promise.reject('No file selected');
         });
       }
       return chooseFiles(this.$refs.fileChooser, multiple, save, path, extention);
