@@ -391,12 +391,9 @@ else
     }))
     if config.webview.native then
       serialWorker = require('jls.util.SerialWorker'):new()
-      serialWorker:call(function()
-        local win32 = require('win32')
-        win32.SetWindowOwner();
-        _G.win32 = win32
-      end)
       local function getFileName(message)
+        local win32 = require('win32')
+        win32.SetWindowOwner()
         if message then
           if message.save then
             return {win32.GetSaveFileName()}
