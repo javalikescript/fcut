@@ -35,11 +35,16 @@ return class.create(function(ffmpeg)
   end
 
   function ffmpeg:configure(options)
-    self.ffmpegPath = options.ffmpeg
+    local ffDir = File:new(options.ffmpeg)
+    if ffDir:isDirectory() then
+      self.ffmpegPath = File:new(ffDir, getExecutableName('ffmpeg')):getPath()
+    else
+      self.ffmpegPath = ffDir:getPath()
+      ffDir = ffDir:getParentFile()
+    end
     if options.ffprobe then
       self.ffprobePath = options.ffprobe
     else
-      local ffDir = File:new(self.ffmpegPath):getParentFile()
       if ffDir then
         self.ffprobePath = File:new(ffDir, getExecutableName('ffprobe')):getPath()
       else
