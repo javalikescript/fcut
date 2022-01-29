@@ -1,6 +1,6 @@
 ## What is Fast Cut?
 
-Fast Cut allows to visually cut and join videos then export losslessly.
+Fast Cut allows to visually cut and join videos then export them losslessly.
 
 > :warning: The project is still experimental.
 

@@ -188,12 +188,16 @@ local function enqueueCommand(args, id, outputFile)
   return promise
 end
 
+-- HTTP contexts used by the web application
+local httpContexts = {
+  ['/(.*)'] = FileHttpHandler:new(File:new(scriptDir, 'htdocs'), nil, 'fcut.html'),
+  ['/config/(.*)'] = TableHttpHandler:new(config, nil, true),
+  ['/assets/(.*)'] = assetsHandler,
+}
+
 -- Create the HTTP contexts used by the web application
 local function createHttpContexts(httpServer)
   logger:info('HTTP Server bound on port '..tostring(select(2, httpServer:getAddress())))
-  httpServer:createContext('/(.*)', FileHttpHandler:new(File:new(scriptDir, 'htdocs'), nil, 'fcut.html'))
-  httpServer:createContext('/config/(.*)', TableHttpHandler:new(config, nil, true))
-  httpServer:createContext('/assets/(.*)', assetsHandler)
   -- Context to retrieve and cache a movie image at a specific time
   httpServer:createContext('/source/([^/]+)/(%d+)%.jpg', Map.assign(FileHttpHandler:new(cacheDir), {
     getPath = function(_, exchange)
@@ -344,6 +348,9 @@ end
 if config.webview.disable then
   local httpServer = require('jls.net.http.HttpServer'):new()
   httpServer:bind(config.webview.address, config.webview.port):next(function()
+    for path, handler in pairs(httpContexts) do
+      httpServer:createContext(path, handler)
+    end
     createHttpContexts(httpServer)
     if config.webview.port == 0 then
       print('FCut HTTP Server available at http://localhost:'..tostring(select(2, httpServer:getAddress())))
@@ -366,6 +373,7 @@ else
     resizable = true,
     bind = true,
     debug = config.webview.debug,
+    contexts = httpContexts,
   }):next(function(webview)
     local httpServer = webview:getHttpServer()
     createHttpContexts(httpServer)
