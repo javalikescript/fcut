@@ -414,6 +414,9 @@ else
         end
       end
       function serialWorker:process(order)
+        if self.workCallback then
+          return Promise.reject()
+        end
         return self:call(getFileName, order)
       end
     end
