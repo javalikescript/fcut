@@ -215,7 +215,7 @@
           <div class="bar-flex-row">
             <label>File:</label>
             <input v-model="destinationFilename" name="filename" type="text" class="bar-flex-row-content"></input>
-            <button v-on:click="selectFiles(false, true).then(function(filename) { destinationFilename = filename; })"><i class="fas fa-file"></i></button>
+            <button v-on:click="selectFiles(false, true, undefined, destinationFilename).then(function(filename) { destinationFilename = filename; })"><i class="fas fa-file"></i></button>
           </div>
           <br />
           <div class="button-bar">

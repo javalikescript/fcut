@@ -415,9 +415,10 @@ else
         win32.SetWindowOwner()
         if message then
           if message.save then
-            return {win32.GetSaveFileName()}
+            return {win32.GetSaveFileName(message.file)}
           end
-          local names = table.pack(win32.GetOpenFileName(message.multiple))
+          local names = table.pack(win32.GetOpenFileName(message.file, message.multiple))
+          --print('getFileName()', table.unpack(names))
           local dir = table.remove(names, 1)
           if #names == 0 then
             return {dir}

@@ -75,11 +75,11 @@ var vm = new Vue({
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            path: path,
             multiple: multiple,
             save: save,
-            extention: extention,
-            name: name
+            dir: path,
+            file: filename,
+            extention: extention
           })
         }).then(function(response) {
           return response.json();
