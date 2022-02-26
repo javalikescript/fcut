@@ -44,7 +44,7 @@
     template: '<div class="file-chooser-dialog">' +
     '<div class="file-chooser-flex-row">' +
     '  <input type="text" v-model="inputPath" v-on:keyup="setPath(inputPath)" class="file-chooser-flex-row-content" />' +
-    '  <button v-on:click="showSettings = !showSettings">&#x2699;</button>' +
+    '  <button v-on:click="showSettings = !showSettings" v-bind:class="{pressed: showSettings}"><i class="fas fa-filter"></i></button>' +
     '</div>' +
     '<div class="file-chooser-content" style="overflow: auto;">' +
     '  <ul>' +
@@ -55,7 +55,7 @@
     '  </ul>' +
     '</div>' +
     '<div v-if="showSettings" class="file-chooser-flex-row">' +
-    '  <button v-on:click="refresh()">Refresh</button>' +
+    '  <button v-on:click="refresh()"><i class="fas fa-redo"></i></button>' +
     '  <span>Filter:</span>' +
     '  <input type="text" v-model="extention" class="file-chooser-flex-row-content" />' +
     '  <input type="checkbox" v-model="showAll" />' +

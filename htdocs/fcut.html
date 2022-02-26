@@ -53,18 +53,26 @@
         </div>
       </div>
     </page>
-    <page name="preview" eclass="scroll">
+    <page name="preview" eclass="scroll" v-on:page-show="arguments[0].$el.focus()">
+      <div tabindex="0" v-on:keyup.e="pages.navigateTo('export')"
+        v-on:keyup.t="bars.time = !bars.time" v-on:keyup.c="bars.cut = !bars.cut" v-on:keyup.s="bars.bsearch = !bars.bsearch" v-on:keyup.p="bars.project = !bars.project"
+        v-on:keyup.delete="removePart(partIndex)" v-on:keyup.enter="split()"
+        v-on:keyup.left="move(-step)" v-on:keyup.right="move(step)"
+        v-on:keyup.up="move(-60)" v-on:keyup.down="move(60)"
+        v-on:keyup.page-up="move(-period)" v-on:keyup.page-down="move(period)"
+        v-on:keyup.home="navigateTo(0)" v-on:keyup.end="navigateTo(duration)">
       <img v-bind:style="{ height: aspectRatio > 0 ? (Math.floor(10000 / aspectRatio) / 100) + 'vw' : undefined }" class="preview" :src="previewSrc" v-on:click="navigateOnPreviewClick" />
       <div class="overlay padded">
         <div class="bar-flex-row">
           <button v-on:click="pages.navigateBack()"><i class="fas fa-arrow-left"></i></button>
           <span class="bar-flex-row-content"></span>
-          <button v-on:click="bars.nav = !bars.nav;" v-bind:class="{pressed: bars.nav}" title="Show navigation bar"><i class="fas fa-stream"></i></button>
-          <button v-on:click="bars.time = !bars.time;" v-bind:class="{pressed: bars.time}" title="Show time bar"><i class="fas fa-forward"></i></button>
-          <button v-on:click="bars.cut = !bars.cut;" v-bind:class="{pressed: bars.cut}" title="Show cut bar"><i class="fas fa-cut"></i></button>
-          <button v-on:click="bars.bsearch = !bars.bsearch;" v-bind:class="{pressed: bars.bsearch}" title="Show binary search bar"><i class="fas fa-search"></i></button>
-          <button v-on:click="bars.project = !bars.project;" v-bind:class="{pressed: bars.project}" title="Show project bar"><i class="fas fa-file"></i></button>
+          <button v-on:click="bars.nav = !bars.nav" v-bind:class="{pressed: bars.nav}" title="Show navigation bar"><i class="fas fa-stream"></i></button>
+          <button v-on:click="bars.time = !bars.time" v-bind:class="{pressed: bars.time}" title="Show time bar"><i class="fas fa-forward"></i></button>
+          <button v-on:click="bars.cut = !bars.cut" v-bind:class="{pressed: bars.cut}" title="Show cut bar"><i class="fas fa-cut"></i></button>
+          <button v-on:click="bars.bsearch = !bars.bsearch" v-bind:class="{pressed: bars.bsearch}" title="Show binary search bar"><i class="fas fa-search"></i></button>
+          <button v-on:click="bars.project = !bars.project" v-bind:class="{pressed: bars.project}" title="Show project bar"><i class="fas fa-file"></i></button>
           <span class="bar-flex-row-content"></span>
+          <button v-on:click="pages.navigateTo('export')"><i class="fas fa-arrow-right"></i></button>
         </div>
       </div>
       <div id="navigation-bar" v-if="bars.nav" v-on:click="navigateOnClick($event, 'navigation-bar')" class="navigation-bar">
@@ -78,22 +86,25 @@
         <a href="#" v-on:click="navigateTo(0)" class="time" title="Go to start">0:00</a>
         <button v-on:click="move(-period)" title="Move backard one period"><i class="fas fa-backward"></i></button>
         <button v-on:click="move(-60)" title="Move backard one minute"><i class="fas fa-fast-backward"></i></button>
-        <button v-on:click="move(-1)" title="Move backard one second"><i class="fas fa-step-backward"></i></button>
+        <button v-on:click="move(-step)" title="Move backard one step"><i class="fas fa-step-backward"></i></button>
         <input type="text" v-model="timeHMS" class="time" title="Preview time" />
-        <button v-on:click="move(1)" title="Move forward one second"><i class="fas fa-step-forward"></i></button>
+        <button v-on:click="move(step)" title="Move forward one step"><i class="fas fa-step-forward"></i></button>
         <button v-on:click="move(60)" title="Move forward one minute"><i class="fas fa-fast-forward"></i></button>
         <button v-on:click="move(period)" title="Move forward one period"><i class="fas fa-forward"></i></button>
         <a href="#" v-on:click="navigateTo(duration)" class="time" title="Go to end">{{ formatHMS(duration) }}</a>
       </div>
       <div v-if="bars.cut" class="button-bar" title="Video edition">
         <button v-on:click="addSources(partIndex)" title="Add sources before the preview part"><i class="fas fa-plus"></i> Insert...</button>
-        <button v-on:click="split()" title="Cut the part in 2 at preview time"><i class="fas fa-cut"></i> Split</button>
-        <button v-on:click="movePart(partIndex, partIndex - 1)" v-bind:disabled="partIndex === 0" title="Move the part backward"><i class="fas fa-arrow-left"></i></button>
-        <button v-on:click="movePart(partIndex, partIndex + 1)" v-bind:disabled="partIndex === parts.length - 1" title="Move the part forward"><i class="fas fa-arrow-right"></i></button>
         <button v-on:click="removePart(partIndex)" title="Discard the preview part"><i class="fas fa-trash"></i> Remove</button>
-        <button v-on:click="pages.navigateTo('export')"><i class="fas fa-cogs"></i> Export...</button>
+        <button v-on:click="movePart(partIndex, partIndex - 1)" v-bind:disabled="partIndex === 0" title="Move the part backward"><i class="fas fa-arrow-left"></i></button>
+        <a href="#" v-on:click="navigateTo(partTime)" class="time" title="Go to period start">{{ formatHMS(partTime) }}</a>
+        /
+        <a href="#" v-on:click="navigateTo(partEndTime)" class="time" title="Go to period end">{{ formatHMS(partEndTime) }}</a>
+        <button v-on:click="movePart(partIndex, partIndex + 1)" v-bind:disabled="partIndex === parts.length - 1" title="Move the part forward"><i class="fas fa-arrow-right"></i></button>
+        <button v-on:click="split()" title="Cut the part in 2 at preview time"><i class="fas fa-cut"></i> Split</button>
       </div>
       <div v-if="bars.bsearch" class="button-bar" title="Binary search">
+        <input type="text" v-model="stepHMS" class="time" title="Step" />
         <input type="text" v-model="periodHMS" class="time" title="Period" />
         <button v-on:click="findNext(false)" title="Move backard"><i class="fas fa-angle-double-left"></i> Back</button>
         <button v-on:click="findNext(true)" title="Move forward"><i class="fas fa-angle-double-right"></i> Next</button>
@@ -115,6 +126,8 @@
         </select>
         <button v-on:click="openProject()" title="Select FCut Project file to open"><i class="fas fa-file"></i> Open...</button>
         <button v-on:click="saveProject()" title="Select FCut Project file to save as"><i class="fas fa-save"></i> Save as...</button>
+        <button v-on:click="pages.navigateTo('export')"><i class="fas fa-cogs"></i> Export...</button>
+      </div>
       </div>
     </page>
     <page name="export">

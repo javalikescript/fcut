@@ -13,6 +13,7 @@ local tables = require('jls.util.tables')
 local strings = require('jls.util.strings')
 local Map = require('jls.util.Map')
 local List = require('jls.util.List')
+local HttpContext = require('jls.net.http.HttpContext')
 local HttpExchange = require('jls.net.http.HttpExchange')
 local FileHttpHandler = require('jls.net.http.handler.FileHttpHandler')
 local RestHttpHandler = require('jls.net.http.handler.RestHttpHandler')
@@ -62,6 +63,9 @@ local function startProcess(command, outputFile, callback)
     fd = FileDescriptor.openSync(outputFile, 'w')
     pb:redirectOutput(fd)
   end
+  if logger:isLoggable(logger.FINE) then
+    logger:fine('Start process: '..table.concat(command, ' '))
+  end
   local ph = pb:start()
   ph:ended():next(function(exitCode)
     if fd then
@@ -96,15 +100,9 @@ end
 
 local scriptFile = File:new(arg[0]):getAbsoluteFile()
 local scriptDir = scriptFile:getParentFile()
-
-local assetsHandler
 local assetsDir = File:new(scriptDir, 'assets')
 local assetsZip = File:new(scriptDir, 'assets.zip')
-if assetsDir:isDirectory() then
-  assetsHandler = FileHttpHandler:new(assetsDir)
-elseif assetsZip:isFile() then
-  assetsHandler = ZipFileHttpHandler:new(assetsZip)
-end
+local extensionsDir = File:new(scriptDir, config.extensions)
 
 local commandQueue = {}
 local commandCount = 0
@@ -132,6 +130,28 @@ local ffmpeg = Ffmpeg:new(cacheDir)
 ffmpeg:configure(config)
 
 -- Application local functions
+
+local function loadExtensions(...)
+  if not extensionsDir:isDirectory() then
+    return
+  end
+  logger:info('Loading extensions from directory "'..extensionsDir:getPath()..'"')
+  for _, extensionDir in ipairs(extensionsDir:listFiles()) do
+    local extensionLuaFile = File:new(extensionDir, 'init.lua')
+    if extensionDir:isDirectory() and extensionLuaFile:isFile() then
+      local scriptFn, err = loadfile(extensionLuaFile:getPath())
+      if not scriptFn or err then
+        logger:warn('Cannot load extension from script "'..extensionLuaFile:getPath()..'" due to '..tostring(err))
+      else
+        local status
+        status, err = pcall(scriptFn, ...)
+        if not status then
+          logger:warn('Cannot load extension from script "'..extensionLuaFile:getPath()..'" due to '..tostring(err))
+        end
+      end
+    end
+  end
+end
 
 local function terminate()
   for _, ph in ipairs(processList) do
@@ -188,18 +208,50 @@ local function enqueueCommand(args, id, outputFile)
   return promise
 end
 
+local function endExport(exportContext, webSocket, exitCode)
+  exportContext.exitCode = exitCode
+  webSocket:close()
+  Map.deleteValues(exportContexts, exportContext)
+end
+
+local function startExportCommand(exportContext, webSocket, index)
+  local command = exportContext.commands[index]
+  if not command then
+    endExport(exportContext, webSocket, 0)
+    return
+  end
+  webSocket:sendTextMessage('\n -- starting command '..tostring(index)..'/'..tostring(#exportContext.commands)..' ------\n\n')
+  local pb = createProcessBuilder(command)
+  local p = Pipe:new()
+  pb:redirectError(p)
+  local ph = pb:start()
+  ph:ended():next(function(exitCode)
+    if exitCode == 0 then
+      startExportCommand(exportContext, webSocket, index + 1)
+    else
+      endExport(exportContext, webSocket, exitCode)
+    end
+  end)
+  exportContext.process = ph
+  p:readStart(function(err, data)
+    if not err and data then
+      webSocket:sendTextMessage(data)
+    else
+      p:close()
+    end
+  end)
+end
+
 -- HTTP contexts used by the web application
 local httpContexts = {
+  -- HTTP resources
   ['/(.*)'] = FileHttpHandler:new(File:new(scriptDir, 'htdocs'), nil, 'fcut.html'),
+  -- Context to retrieve the configuration
   ['/config/(.*)'] = TableHttpHandler:new(config, nil, true),
-  ['/assets/(.*)'] = assetsHandler,
-}
-
--- Create the HTTP contexts used by the web application
-local function createHttpContexts(httpServer)
-  logger:info('HTTP Server bound on port '..tostring(select(2, httpServer:getAddress())))
+  -- Assets HTTP resources directory or ZIP file
+  ['/assets/(.*)'] = assetsZip:isFile() and not assetsDir:isDirectory() and ZipFileHttpHandler:new(assetsZip) or FileHttpHandler:new(assetsDir),
   -- Context to retrieve and cache a movie image at a specific time
-  httpServer:createContext('/source/([^/]+)/(%d+)%.jpg', Map.assign(FileHttpHandler:new(cacheDir), {
+  ['/source/([^/]+)/(%d+%.?%d*)%.jpg'] = Map.assign(FileHttpHandler:new(cacheDir), {
     getPath = function(_, exchange)
       return string.sub(exchange:getRequest():getTargetPath(), 9)
     end,
@@ -210,9 +262,9 @@ local function createHttpContexts(httpServer)
         return enqueueCommand(command, 'preview')
       end)
     end
-  }))
+  }),
   -- Context to retrieve and cache a movie information
-  httpServer:createContext('/source/([^/]+)/info%.json', Map.assign(FileHttpHandler:new(cacheDir), {
+  ['/source/([^/]+)/info%.json'] = Map.assign(FileHttpHandler:new(cacheDir), {
     getPath = function(_, exchange)
       return string.sub(exchange:getRequest():getTargetPath(), 9)
     end,
@@ -223,9 +275,9 @@ local function createHttpContexts(httpServer)
         return enqueueCommand(command, nil, tmpFile)
       end)
     end
-  }))
+  }),
   -- Context for the application REST API
-  httpServer:createContext('/rest/(.*)', RestHttpHandler:new({
+  ['/rest/(.*)'] = RestHttpHandler:new({
     ['getSourceId?method=POST'] = function(exchange)
       local filename = exchange:getRequest():getBody()
       return ffmpeg:openSource(filename)
@@ -288,9 +340,9 @@ local function createHttpContexts(httpServer)
       }
       return exportId
     end,
-  }))
+  }),
   -- Context that handle the export commands and output to a WebSocket
-  httpServer:createContext('/console/(.*)', Map.assign(WebSocketUpgradeHandler:new(), {
+  ['/console/(.*)'] = Map.assign(WebSocketUpgradeHandler:new(), {
     onOpen = function(_, webSocket, exchange)
       local exportId = exchange:getRequestArguments()
       local exportContext = exportContexts[exportId]
@@ -298,60 +350,23 @@ local function createHttpContexts(httpServer)
         webSocket:close()
         return
       end
-      local commands = exportContext.commands
       local header = {' -- export commands ------'};
-      for index, command in ipairs(commands) do
+      for index, command in ipairs(exportContext.commands) do
         table.insert(header, '  '..tostring(index)..': '..table.concat(command, ' '))
       end
       table.insert(header, '')
       webSocket:sendTextMessage(table.concat(header, '\n'))
-      local function endExport(exitCode)
-        exportContext.exitCode = exitCode
-        webSocket:close()
-        exportContexts[exportId] = nil
-      end
-      local index = 0
-      local function startNextCommand()
-        index = index + 1
-        if index > #commands then
-          endExport(0)
-          return
-        end
-        local command = commands[index]
-        webSocket:sendTextMessage('\n -- starting command '..tostring(index)..'/'..tostring(#commands)..' ------\n\n')
-        local pb = createProcessBuilder(command)
-        local p = Pipe:new()
-        pb:redirectError(p)
-        local ph = pb:start()
-        ph:ended():next(function(exitCode)
-          if exitCode == 0 then
-            startNextCommand()
-          else
-            endExport(exitCode)
-          end
-        end)
-        exportContext.process = ph
-        p:readStart(function(err, data)
-          if not err and data then
-            webSocket:sendTextMessage(data)
-          else
-            p:close()
-          end
-        end)
-      end
-      startNextCommand()
+      startExportCommand(exportContext, webSocket, 1)
     end
-  }))
-end
+  }),
+  HttpContext:new('/extensions/([a-zA-Z0-9%-_]+)/(.*)', FileHttpHandler:new(extensionsDir, 'r', 'index.html')):setPathReplacement('%1/htdocs/%2'),
+}
 
 -- Start the application as an HTTP server or a WebView
 if config.webview.disable then
   local httpServer = require('jls.net.http.HttpServer'):new()
   httpServer:bind(config.webview.address, config.webview.port):next(function()
-    for path, handler in pairs(httpContexts) do
-      httpServer:createContext(path, handler)
-    end
-    createHttpContexts(httpServer)
+    httpServer:createContexts(httpContexts)
     if config.webview.port == 0 then
       print('FCut HTTP Server available at http://localhost:'..tostring(select(2, httpServer:getAddress())))
     end
@@ -363,12 +378,17 @@ if config.webview.disable then
         --HttpExchange.ok(exchange, 'Closing')
       end,
     }))
+    loadExtensions(httpServer)
   end, function(err)
     logger:warn('Cannot bind HTTP server due to '..tostring(err))
     os.exit(1)
   end)
 else
-  require('jls.util.WebView').open('http://localhost:'..tostring(config.webview.port)..'/', {
+  local url = 'http://localhost:'..tostring(config.webview.port)..'/'
+  if config.extension then
+    url = url..'extensions/'..config.extension..'/'
+  end
+  require('jls.util.WebView').open(url, {
     title = 'Fast Cut (Preview)',
     resizable = true,
     bind = true,
@@ -376,7 +396,6 @@ else
     contexts = httpContexts,
   }):next(function(webview)
     local httpServer = webview:getHttpServer()
-    createHttpContexts(httpServer)
     httpServer:createContext('/webview/(.*)', RestHttpHandler:new({
       ['fullscreen(requestJson)?method=POST&Content-Type=application/json'] = function(exchange, fullscreen)
         webview:fullscreen(fullscreen == true);
@@ -417,6 +436,7 @@ else
         return self:call(getFileName, order)
       end
     end
+    loadExtensions(httpServer)
     return webview:getThread():ended()
   end):next(function()
     logger:info('WebView closed')

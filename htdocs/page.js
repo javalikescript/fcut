@@ -4,11 +4,22 @@ var pages = {
   names: {},
   navigationHistory: [],
   navigateTo: function(name, replace) {
+    if (this.name == name) {
+      return;
+    }
+    var previousPage = this.names[this.name];
     this.name = name;
     if (replace) {
       this.navigationHistory.pop();
     }
     this.navigationHistory.push(name);
+    var page = this.names[name];
+    if (previousPage) {
+      previousPage.$emit('page-hide', previousPage);
+    }
+    if (page) {
+      page.$emit('page-show', page);
+    }
   },
   navigateBack: function() {
     if (this.navigationHistory.length > 1) {

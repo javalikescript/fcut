@@ -2,13 +2,17 @@
 var partRegExp = /^\n -- starting command ([0-9]+)\/([0-9]+)\s/;
 var timeRegExp = /^frame=.*\stime=([0-9:.]+)\s/;
 
+var DEFAULT_DESTINATION_FILENAME = 'fcut-out.mp4';
+var DEFAULT_PROJECT_FILENAME = 'fcut-project.json';
+
 var vm = new Vue({
   el: '#app',
   data: {
     config: {},
     sources: {},
     previewSrc: 'roll.png',
-    destinationFilename: 'out.mp4',
+    destinationFilename: DEFAULT_DESTINATION_FILENAME,
+    projectFilename: DEFAULT_PROJECT_FILENAME,
     aspectRatio: 0,
     bars: {
       nav: true,
@@ -17,6 +21,7 @@ var vm = new Vue({
       bsearch: false,
       project: false
     },
+    step: 1,
     period: 180,
     findPeriod: 180,
     findForward: true,
@@ -55,8 +60,13 @@ var vm = new Vue({
       this.messageTitle = title || 'Message';
       return showMessage();
     },
-    selectFiles: function(multiple, save, extention) {
+    selectFiles: function(multiple, save, extention, filename) {
       var path = this.keepFileChooserPath ? undefined : this.config.media;
+      var name = undefined;
+      if (filename) {
+        name = basename(filename);
+        path = dirname(filename);
+      }
       this.keepFileChooserPath = true;
       if (this.config.webview.native) {
         return fetch('webview/selectFiles', {
@@ -68,7 +78,8 @@ var vm = new Vue({
             path: path,
             multiple: multiple,
             save: save,
-            extention: extention
+            extention: extention,
+            name: name
           })
         }).then(function(response) {
           return response.json();
@@ -82,14 +93,17 @@ var vm = new Vue({
           return Promise.reject('No file selected');
         });
       }
-      return chooseFiles(this.$refs.fileChooser, multiple, save, path, extention);
+      return chooseFiles(this.$refs.fileChooser, multiple, save, path, extention, name);
     },
     addSources: function(beforeIndex) {
       var that = this;
       return that.selectFiles(true, false, that.config.mediaFilter).then(function(filenames) {
         return Promise.all(filenames.map(function(filename) {
-          return that.openSource(filename, beforeIndex).then(function(sourceId) {
+          return that.openSource(filename).then(function(sourceId) {
             that.addSource(sourceId, beforeIndex);
+            if (that.destinationFilename == DEFAULT_DESTINATION_FILENAME) {
+              that.destinationFilename = withoutExtension(filename) + '.' + that.exportFormat;
+            }
           });
         })).then(function() {
           that.goTo(that.time);
@@ -126,6 +140,12 @@ var vm = new Vue({
           if (checkFFmpeg.status) {
             if (that.config.project) {
               that.loadProjectFromFile(that.config.project).then(function() {
+                pages.navigateTo('preview');
+              });
+            } else if (that.config.source) {
+              that.openSource(that.config.source).then(function(sourceId) {
+                that.addSource(sourceId);
+                that.goTo(that.time);
                 pages.navigateTo('preview');
               });
             } else {
@@ -291,7 +311,8 @@ var vm = new Vue({
     },
     findNext: function(forward) {
       if ((forward !== this.findForward) || (this.findPeriod < this.period)) {
-        this.findPeriod = Math.floor(this.findPeriod / 2);
+        var stepMs = Math.floor(this.step * 1000);
+        this.findPeriod = Math.floor(this.findPeriod * 500 / stepMs) * stepMs / 1000;
         this.findForward = forward;
       }
       this.goTo(this.time + (this.findForward ? 1 : -1) * this.findPeriod);
@@ -450,10 +471,14 @@ var vm = new Vue({
     saveProject: function() {
       var content = JSON.stringify(this.saveProjectToJson(), null, 2)
       var that = this;
-      return this.selectFiles(false, true, '.json').then(function(filename) {
+      if (that.projectFilename == DEFAULT_PROJECT_FILENAME) {
+        that.projectFilename = withoutExtension(this.destinationFilename) + '.json';
+      }
+      return this.selectFiles(false, true, '.json', that.projectFilename).then(function(filename) {
         return checkFile(filename).catch(function(filename) {
           return that.showMessage('The file exists.\n' + filename + '\nDo you want to overwrite?');
         }).then(function() {
+          that.projectFilename = filename;
           writeFile(filename, content, true);
         });
       });
@@ -461,6 +486,7 @@ var vm = new Vue({
     openProject: function() {
       var that = this;
       return this.selectFiles(false, false, '.json').then(function(filename) {
+        that.projectFilename = filename;
         return that.loadProjectFromFile(filename);
       });
     }
@@ -480,6 +506,14 @@ var vm = new Vue({
       },
       set: function(newValue) {
         this.period = parseHMS(newValue);
+      }
+    },
+    stepHMS: {
+      get: function() {
+        return formatHMS(this.step);
+      },
+      set: function(newValue) {
+        this.step = parseHMS(newValue);
       }
     }
   }

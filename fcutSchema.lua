@@ -27,6 +27,19 @@ return {
       title = 'A project file to load',
       type = 'string',
     },
+    source = {
+      title = 'A source file to add',
+      type = 'string',
+    },
+    extension = {
+      title = 'The extensions path',
+      type = 'string',
+    },
+    extensions = {
+      title = 'The extension to open at startup',
+      type = 'string',
+      default = 'extensions',
+    },
     processCount = {
       title = 'The maximum number of running processes',
       type = 'integer',
@@ -40,7 +53,7 @@ return {
       default = (require('jls.lang.system').isWindows() and 'ffmpeg\\ffmpeg.exe' or '/usr/bin/ffmpeg'),
     },
     ffprobe = {
-      title = 'The ffprobe path',
+      title = 'The ffprobe path, the default value is computed from the ffmpeg path',
       type = 'string',
     },
     loglevel = {

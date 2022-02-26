@@ -85,6 +85,26 @@ function showMessage() {
   });
 }
 
+function withoutExtension(filename) {
+  if (typeof filename !== 'string') {
+    return filename;
+  }
+  return filename.replace(/\.[^/\\.]+$/, '');
+}
+
+function basename(filename) {
+  if (typeof filename !== 'string') {
+    return filename;
+  }
+  return filename.replace(/^.*[/\\]([^/\\]+)$/, '$1');
+}
+
+function dirname(filename) {
+  if (typeof filename !== 'string') {
+    return filename;
+  }
+  return filename.replace(/[/\\][^/\\]+$/, '');
+}
 
 var fileChooserCallback = null;
 
@@ -107,11 +127,12 @@ function onFileChoosed(names) {
   }
 }
 
-function chooseFiles(fileChooser, multiple, save, path, extention) {
+function chooseFiles(fileChooser, multiple, save, path, extention, name) {
   fileChooser.multiple = multiple === true;
   fileChooser.save = save === true;
   fileChooser.label = save ? 'Save' : 'Open';
   fileChooser.extention = extention || '';
+  fileChooser.name = name || '';
   if (path) {
     fileChooser.list(path);
   } else {
