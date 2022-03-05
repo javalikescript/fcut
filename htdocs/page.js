@@ -21,7 +21,33 @@ var pages = {
       page.$emit('page-show', page);
     }
   },
-  navigateBack: function() {
+  current: function() {
+    return this.names[this.name];
+  },
+  dispatchKey: function(event) {
+    var tagName = event.target.tagName.toUpperCase();
+    if (tagName !== 'INPUT') {
+      var eventName = event.key;
+      if (eventName.length > 1) {
+        eventName = eventName.toLowerCase();
+      }
+      if (eventName.substring(0, 5) === 'arrow') {
+        eventName = eventName.substring(5);
+      }
+      if (event.altKey) {
+        eventName = 'alt-' + eventName;
+      }
+      if (event.ctrlKey) {
+        eventName = 'ctrl-' + eventName;
+      }
+      //console.log('dispatchKey(): ' + eventName, event, this);
+      var page = this.names[this.name];
+      if (page) {
+        page.$emit('page-key-' + eventName, event);
+      }
+    }
+  },
+navigateBack: function() {
     if (this.navigationHistory.length > 1) {
       this.navigationHistory.pop();
       this.name = this.navigationHistory[this.navigationHistory.length - 1];

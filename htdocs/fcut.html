@@ -16,14 +16,14 @@
   <script src="FileChooser.js" type="text/javascript"></script>
   <script src="fcut-utils.js" type="text/javascript"></script>
 </head><body>
-  <div id="app">
+  <div id="app" tabindex="0" v-on:keyup="pages.dispatchKey($event)">
     <page name="home">
       <div class="padded">
         <div class="bar-flex-row">
           <button v-on:click="openProject().then(function() { pages.navigateTo('preview'); })" title="Select FCut Project file to open"><i class="fas fa-file"></i></button>
           <button v-on:click="saveProject()" title="Select FCut Project file to save as"><i class="fas fa-save"></i></button>
           <span class="bar-flex-row-content"></span>
-          <button v-on:click="pages.navigateTo('about')"><i class="fas fa-question"></i></button>
+          <button v-on:click="pages.navigateTo('help')"><i class="fas fa-question"></i></button>
         </div>
         <h2>Fast FFmpeg Cutter (Preview)</h2>
         <div class="flow">
@@ -53,14 +53,13 @@
         </div>
       </div>
     </page>
-    <page name="preview" eclass="scroll" v-on:page-show="arguments[0].$el.focus()">
-      <div tabindex="0" v-on:keyup.e="pages.navigateTo('export')"
-        v-on:keyup.t="bars.time = !bars.time" v-on:keyup.c="bars.cut = !bars.cut" v-on:keyup.s="bars.bsearch = !bars.bsearch" v-on:keyup.p="bars.project = !bars.project"
-        v-on:keyup.delete="removePart(partIndex)" v-on:keyup.enter="split()"
-        v-on:keyup.left="move(-step)" v-on:keyup.right="move(step)"
-        v-on:keyup.up="move(-60)" v-on:keyup.down="move(60)"
-        v-on:keyup.page-up="move(-period)" v-on:keyup.page-down="move(period)"
-        v-on:keyup.home="navigateTo(0)" v-on:keyup.end="navigateTo(duration)">
+    <page name="preview" eclass="scroll" v-on:page-key-e="pages.navigateTo('export')"
+      v-on:page-key-t="bars.time = !bars.time" v-on:page-key-c="bars.cut = !bars.cut" v-on:page-key-s="bars.bsearch = !bars.bsearch" v-on:page-key-p="bars.project = !bars.project"
+      v-on:page-key-delete="removePart(partIndex)" v-on:page-key-enter="split()"
+      v-on:page-key-left="move(-step)" v-on:page-key-right="move(step)"
+      v-on:page-key-up="move(-60)" v-on:page-key-down="move(60)"
+      v-on:page-key-pageup="move(-period)" v-on:page-key-pagedown="move(period)"
+      v-on:page-key-home="navigateTo(0)" v-on:page-key-end="navigateTo(duration)">
       <img v-bind:style="{ height: aspectRatio > 0 ? (Math.floor(10000 / aspectRatio) / 100) + 'vw' : undefined }" class="preview" :src="previewSrc" v-on:click="navigateOnPreviewClick" />
       <div class="overlay padded">
         <div class="bar-flex-row">
@@ -84,9 +83,9 @@
       </div>
       <div v-if="bars.time" class="button-bar" title="Preview time">
         <a href="#" v-on:click="navigateTo(0)" class="time" title="Go to start">0:00</a>
-        <button v-on:click="move(-period)" title="Move backard one period"><i class="fas fa-backward"></i></button>
-        <button v-on:click="move(-60)" title="Move backard one minute"><i class="fas fa-fast-backward"></i></button>
-        <button v-on:click="move(-step)" title="Move backard one step"><i class="fas fa-step-backward"></i></button>
+        <button v-on:click="move(-period)" title="Move backward one period"><i class="fas fa-backward"></i></button>
+        <button v-on:click="move(-60)" title="Move backward one minute"><i class="fas fa-fast-backward"></i></button>
+        <button v-on:click="move(-step)" title="Move backward one step"><i class="fas fa-step-backward"></i></button>
         <input type="text" v-model="timeHMS" class="time" title="Preview time" />
         <button v-on:click="move(step)" title="Move forward one step"><i class="fas fa-step-forward"></i></button>
         <button v-on:click="move(60)" title="Move forward one minute"><i class="fas fa-fast-forward"></i></button>
@@ -102,11 +101,12 @@
         <a href="#" v-on:click="navigateTo(partEndTime)" class="time" title="Go to period end">{{ formatHMS(partEndTime) }}</a>
         <button v-on:click="movePart(partIndex, partIndex + 1)" v-bind:disabled="partIndex === parts.length - 1" title="Move the part forward"><i class="fas fa-arrow-right"></i></button>
         <button v-on:click="split()" title="Cut the part in 2 at preview time"><i class="fas fa-cut"></i> Split</button>
+        <button v-on:click="join()" v-bind:disabled="!canJoin" title="Join the 2 parts"><i class="fas fa-paperclip"></i> Join</button>
       </div>
       <div v-if="bars.bsearch" class="button-bar" title="Binary search">
         <input type="text" v-model="stepHMS" class="time" title="Step" />
         <input type="text" v-model="periodHMS" class="time" title="Period" />
-        <button v-on:click="findNext(false)" title="Move backard"><i class="fas fa-angle-double-left"></i> Back</button>
+        <button v-on:click="findNext(false)" title="Move backward"><i class="fas fa-angle-double-left"></i> Back</button>
         <button v-on:click="findNext(true)" title="Move forward"><i class="fas fa-angle-double-right"></i> Next</button>
         <div class="time" title="Search period" style="display: inline-block;">
           <i v-if="findPeriod === 0" class="fas fa-check"></i>
@@ -127,7 +127,6 @@
         <button v-on:click="openProject()" title="Select FCut Project file to open"><i class="fas fa-file"></i> Open...</button>
         <button v-on:click="saveProject()" title="Select FCut Project file to save as"><i class="fas fa-save"></i> Save as...</button>
         <button v-on:click="pages.navigateTo('export')"><i class="fas fa-cogs"></i> Export...</button>
-      </div>
       </div>
     </page>
     <page name="export">
@@ -248,7 +247,7 @@
       <div class="padded">
         <div class="bar-flex-row">
           <span class="bar-flex-row-content"></span>
-          <button v-on:click="pages.navigateTo('about')"><i class="fas fa-question"></i></button>
+          <button v-on:click="pages.navigateTo('help')"><i class="fas fa-question"></i></button>
         </div>
         <h2>Missing Configuration</h2>
         <p>It seems that some configuration is missing or invalid.</p>
@@ -257,9 +256,14 @@
           or on the <a href="https://github.com/javalikescript/fcut/releases/download/v0.3.0/ffmpeg-x86_64-windows.zip" target="_blank">FCut github</a>.</li>
       </div>
     </page>
-    <page name="about">
+    <page name="help">
       <div class="padded">
         <button v-on:click="pages.navigateBack()"><i class="fas fa-arrow-left"></i></button>
+        <h2>Help</h2>
+        <p>Fast Cut allows to visually cut and join videos then export them losslessly.</p>
+        <p>The binary search helps you to find a cut time quickly,
+          use the forward and backward buttons to indicate the cut location,
+          the time shows how close you are from the cut point.</p>
         <h2>About</h2>
         <p>A <a href="https://github.com/javalikescript/luajls" target="_blank">luajls</a> application, see <a href="https://github.com/javalikescript/fcut" target="_blank">sources</a>.</p>
         <p>This application uses the following external software/libraries</p>

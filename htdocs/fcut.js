@@ -36,6 +36,7 @@ var vm = new Vue({
     partTime: 0,
     partEndTime: 0,
     partInfo: {},
+    canJoin: false,
     time: 0,
     logBuffer: '',
     logLine: '',
@@ -258,12 +259,14 @@ var vm = new Vue({
         this.partTime = at.time;
         this.partEndTime = at.time + at.part.duration;
         this.partInfo = this.sources[at.part.sourceId];
+        this.canJoin = this.getJoinFirstindex(at) >= 0;
       } else {
         this.previewSrc = 'roll.png';
         this.partIndex = 0;
         this.partTime = 0;
         this.partEndTime = 0;
         this.partInfo = {}
+        this.canJoin = false;
       }
     },
     movePart: function(atIndex, toIndex) {
@@ -286,9 +289,42 @@ var vm = new Vue({
         }
       }
     },
+    getJoinFirstindex: function(at) {
+      if (at) {
+        var firstIndex;
+        if (at.relTime <= this.step) {
+          firstIndex = at.index - 1;
+        } else if (at.part.duration - at.relTime <= this.step) {
+          firstIndex = at.index;
+        }
+        if ((firstIndex >= 0) && (firstIndex < this.parts.length)) {
+          var part1 = this.parts[firstIndex];
+          var part2 = this.parts[firstIndex + 1];
+          if (part1 && part2 && (part1.sourceId === part2.sourceId)) {
+            return firstIndex;
+          }
+        }
+      }
+      return -1;
+    },
+    join: function() {
+      var at = this.findPartAndTime(this.time);
+      var firstIndex = this.getJoinFirstindex(at);
+      if (firstIndex >= 0) {
+        var part1 = this.parts[firstIndex];
+        var part2 = this.parts[firstIndex + 1];
+        var part = {
+          sourceId: part1.sourceId,
+          duration: part1.duration + part2.duration,
+          from: part1.from,
+          to: part2.to
+        };
+        this.parts.splice(firstIndex, 2, part);
+      }
+    },
     split: function() {
       var at = this.findPartAndTime(this.time);
-      if (at && (at.relTime > 0)&& (at.relTime < at.part.duration)) {
+      if (at && (at.relTime > 0) && (at.relTime < at.part.duration)) {
         var part = at.part;
         var splitTime = part.from + at.relTime;
         var part1 = {
