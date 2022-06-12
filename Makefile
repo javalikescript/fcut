@@ -1,21 +1,12 @@
-
-UNAME_S := $(shell uname -s)
-UNAME_M := $(shell uname -m)
-MK_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
-
-ARCH = x86_64
-
-ifeq ($(UNAME_S),Linux)
-	PLAT ?= linux
-else
-	PLAT ?= windows
-	MK_PATH := $(subst /c/,C:/,$(MK_PATH))
-endif
-
-LUACLIBS := ../luaclibs/dist-$(PLAT)
+LUACLIBS := ../luaclibs/dist
 FCUT_DIST := dist
 FCUT_DIST_CLUA := $(FCUT_DIST)/bin
 FCUT_DIST_LUA := $(FCUT_DIST)/lua
+
+PLAT ?= $(shell grep ^platform $(LUACLIBS)/versions.txt | cut -f2)
+TARGET_NAME ?= $(shell grep ^target $(LUACLIBS)/versions.txt | cut -f2)
+RELEASE_DATE = $(shell date '+%Y%m%d')
+RELEASE_NAME ?= -$(TARGET_NAME).$(RELEASE_DATE)
 
 SO_windows=dll
 EXE_windows=.exe
@@ -30,24 +21,13 @@ EXE := $(EXE_$(PLAT))
 MAIN_MK := $(MK_$(PLAT))
 ZIP := $(ZIP_$(PLAT))
 
-GCC_NAME ?= $(shell gcc -dumpmachine)
-LUA_APP = $(LUACLIBS)/lua$(EXE)
-LUA_DATE = $(shell $(LUA_APP) -e "print(os.date('%Y%m%d'))")
-DIST_SUFFIX ?= -$(GCC_NAME).$(LUA_DATE)
-
-WEBVIEW_ARCH = x64
-ifeq (,$(findstring x86_64,$(GCC_NAME)))
-  WEBVIEW_ARCH = x86
-endif
-
 main: dist-archive
 
 show:
-	@echo ARCH: $(ARCH)
 	@echo PLAT: $(PLAT)
-	@echo DIST_SUFFIX: $(DIST_SUFFIX)
-	@echo UNAME_S: $(UNAME_S)
-	@echo UNAME_M: $(UNAME_M)
+	@echo TARGET_NAME: $(TARGET_NAME)
+	@echo RELEASE_DATE: $(RELEASE_DATE)
+	@echo RELEASE_NAME: $(RELEASE_NAME)
 
 dist-copy-linux:
 	-cp -u $(LUACLIBS)/linux.$(SO) $(FCUT_DIST_CLUA)/
@@ -92,19 +72,19 @@ dist-full: dist
 	-cp -ru ffmpeg/ $(FCUT_DIST)/
 
 dist.tar.gz:
-	cd $(FCUT_DIST) && tar --group=jls --owner=jls -zcvf fcut$(DIST_SUFFIX).tar.gz *
+	cd $(FCUT_DIST) && tar --group=jls --owner=jls -zcvf fcut$(RELEASE_NAME).tar.gz *
 
 dist.zip:
-	cd $(FCUT_DIST) && zip -r fcut$(DIST_SUFFIX).zip *
+	cd $(FCUT_DIST) && zip -r fcut$(RELEASE_NAME).zip *
 
 dist-archive: dist dist$(ZIP)
 
-dist-full-archive: dist-full dist$(ZIP)
-	mv $(FCUT_DIST)/fcut$(DIST_SUFFIX).zip $(FCUT_DIST)/fcut-ffmpeg$(DIST_SUFFIX).zip
+dist-full-archive release: dist-full dist$(ZIP)
+	mv $(FCUT_DIST)/fcut$(RELEASE_NAME).zip $(FCUT_DIST)/fcut-ffmpeg$(RELEASE_NAME).zip
 
 ffmpeg.zip:
-	cd ffmpeg && zip -r ../dist/ffmpeg-$(ARCH)-$(PLAT).zip *
+	cd ffmpeg && zip -q -r ../dist/ffmpeg-$(ARCH)-$(PLAT).zip *
 
-ffmpeg-archive: ffmpeg$(ZIP)
+ffmpeg-archive : ffmpeg$(ZIP)
 
 .PHONY: dist
