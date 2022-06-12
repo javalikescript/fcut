@@ -21,7 +21,6 @@ return {
     mediaFilter = {
       title = 'The media file filter',
       type = 'string',
-      default = '.m2ts',
     },
     project = {
       title = 'A project file to load',
