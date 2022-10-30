@@ -215,7 +215,7 @@ return class.create(function(ffmpeg)
       Promise.reject('Unknown source id "'..id..'"');
     end
     local time = LocalDateTime:new():plusSeconds(sec or 0):toTimeString()
-    local args = {self.ffmpegPath, '-hide_banner', '-v', '0', '-ss', time, '-i', sourceFile:getPath(), '-f', 'singlejpeg', '-vcodec', 'mjpeg', '-vframes', '1', '-an'}
+    local args = {self.ffmpegPath, '-hide_banner', '-v', '0', '-ss', time, '-i', sourceFile:getPath(), '-f', 'mjpeg', '-vcodec', 'mjpeg', '-vframes', '1', '-an'}
     if width and height then
       TableList.concat(args, '-s', tostring(width)..'x'..tostring(height))
     end
