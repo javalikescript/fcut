@@ -58,8 +58,8 @@ return {
     loglevel = {
       title = 'The log level',
       type = 'string',
-      default = 'WARN',
-      enum = {'ERROR', 'WARN', 'INFO', 'CONFIG', 'FINE', 'FINER', 'FINEST', 'DEBUG', 'ALL'},
+      default = 'warn',
+      enum = {'error', 'warn', 'info', 'config', 'fine', 'finer', 'finest', 'debug', 'all'},
     },
     webview = {
       type = 'object',
@@ -86,6 +86,20 @@ return {
           default = 0,
           minimum = 0,
           maximum = 65535,
+        },
+        width = {
+          title = 'The WebView width',
+          type = 'integer',
+          default = 800,
+          minimum = 320,
+          maximum = 7680,
+        },
+        height = {
+          title = 'The WebView height',
+          type = 'integer',
+          default = 700,
+          minimum = 240,
+          maximum = 4320,
         },
         native = {
           title = 'Enable native open file dialog',

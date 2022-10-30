@@ -392,6 +392,8 @@ else
     title = 'Fast Cut (Preview)',
     resizable = true,
     bind = true,
+    width = config.webview.width,
+    height = config.webview.height,
     debug = config.webview.debug,
     contexts = httpContexts,
   }):next(function(webview)
