@@ -16,9 +16,9 @@ var vm = new Vue({
     aspectRatio: 0,
     bars: {
       nav: true,
-      time: false,
+      time: true,
       cut: true,
-      bsearch: false,
+      bsearch: true,
       project: false
     },
     step: 1,

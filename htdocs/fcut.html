@@ -84,11 +84,13 @@
       <div v-if="bars.time" class="button-bar" title="Preview time">
         <a href="#" v-on:click="navigateTo(0)" class="time" title="Go to start">0:00</a>
         <button v-on:click="move(-period)" title="Move backward one period"><i class="fas fa-backward"></i></button>
-        <button v-on:click="move(-60)" title="Move backward one minute"><i class="fas fa-fast-backward"></i></button>
+        <button v-on:click="move(-60)" title="Move backward one minute">-1mn</button>
+        <button v-on:click="move(-10)" title="Move backward ten seconds">-10s</button>
         <button v-on:click="move(-step)" title="Move backward one step"><i class="fas fa-step-backward"></i></button>
         <input type="text" v-model="timeHMS" class="time" title="Preview time" />
         <button v-on:click="move(step)" title="Move forward one step"><i class="fas fa-step-forward"></i></button>
-        <button v-on:click="move(60)" title="Move forward one minute"><i class="fas fa-fast-forward"></i></button>
+        <button v-on:click="move(10)" title="Move forward ten seconds">+10s</button>
+        <button v-on:click="move(60)" title="Move forward one minute">+1mn</button>
         <button v-on:click="move(period)" title="Move forward one period"><i class="fas fa-forward"></i></button>
         <a href="#" v-on:click="navigateTo(duration)" class="time" title="Go to end">{{ formatHMS(duration) }}</a>
       </div>
