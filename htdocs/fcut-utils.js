@@ -198,3 +198,15 @@ function readFile(filename, asJson) {
     return response.text();
   });
 }
+
+function hashString(s) {
+  var h = 0;
+  if (typeof s !== 'string') {
+    s = '' + s;
+  }
+  for (var i = 0; i < s.length; i++) {
+    h = ((h << 5) - h) + s.charCodeAt(i);
+    h |= 0;
+  }
+  return h;
+}

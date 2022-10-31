@@ -76,7 +76,7 @@
       </div>
       <div id="navigation-bar" v-if="bars.nav" v-on:click="navigateOnClick($event, 'navigation-bar')" class="navigation-bar">
         <span v-for="(part, index) in parts" class="part" v-bind:style="{
-          'background-color': hsvToRgb((index * 67) % 240 / 240, 0.8, partIndex === index ? 0.8 : 0.5),
+          'background-color': hsvToRgb(part ? part.hue : 0, 0.8, partIndex === index ? 0.8 : 0.5),
           width: (Math.floor((part ? part.duration : 0) * 980 / duration) / 10) + '%'
         }"></span>
         <span v-bind:style="{ left: (Math.floor(time * 980 / duration) / 10 + 1) + '%' }" class="position"></span>

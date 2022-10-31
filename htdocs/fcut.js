@@ -5,6 +5,14 @@ var timeRegExp = /^frame=.*\stime=([0-9:.]+)\s/;
 var DEFAULT_DESTINATION_FILENAME = 'fcut-out.mp4';
 var DEFAULT_PROJECT_FILENAME = 'fcut-project.json';
 
+function updatePart(part) {
+  if (typeof part === 'object') {
+    var u = hashString(part.sourceId + (part.from | 0).toString(16));
+    part.hue = Math.abs(u) % 240 / 240;
+  }
+  return part;
+}
+
 var vm = new Vue({
   el: '#app',
   data: {
@@ -171,12 +179,12 @@ var vm = new Vue({
     addSource: function(sourceId, beforeIndex) {
       var info = this.sources[sourceId];
       var duration = Math.floor(parseFloat(info.format.duration) - 1.1);
-      var part = {
+      var part = updatePart({
         sourceId: sourceId,
         duration: duration,
         from: 0,
         to: duration
-      };
+      });
       if ((beforeIndex >= 0) && (beforeIndex < this.parts.length)) {
         this.parts.splice(beforeIndex, 0, part);
       } else {
@@ -313,12 +321,12 @@ var vm = new Vue({
       if (firstIndex >= 0) {
         var part1 = this.parts[firstIndex];
         var part2 = this.parts[firstIndex + 1];
-        var part = {
+        var part = updatePart({
           sourceId: part1.sourceId,
           duration: part1.duration + part2.duration,
           from: part1.from,
           to: part2.to
-        };
+        });
         this.parts.splice(firstIndex, 2, part);
       }
     },
@@ -327,18 +335,18 @@ var vm = new Vue({
       if (at && (at.relTime > 0) && (at.relTime < at.part.duration)) {
         var part = at.part;
         var splitTime = part.from + at.relTime;
-        var part1 = {
+        var part1 = updatePart({
           sourceId: part.sourceId,
           duration: at.relTime,
           from: part.from,
           to: splitTime
-        };
-        var part2 = {
+        });
+        var part2 = updatePart({
           sourceId: part.sourceId,
           duration: part.duration - at.relTime,
           from: splitTime,
           to: part.to
-        };
+        });
         this.partTime = this.time;
         this.partEndTime = this.time + part2.duration;
         this.parts.splice(at.index, 1, part1, part2);

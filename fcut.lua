@@ -398,6 +398,7 @@ else
     contexts = httpContexts,
   }):next(function(webview)
     local httpServer = webview:getHttpServer()
+    logger:info('FCut HTTP Server available at http://localhost:%s/', (select(2, httpServer:getAddress())))
     httpServer:createContext('/webview/(.*)', RestHttpHandler:new({
       ['fullscreen(requestJson)?method=POST&Content-Type=application/json'] = function(exchange, fullscreen)
         webview:fullscreen(fullscreen == true);
