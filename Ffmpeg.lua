@@ -176,7 +176,7 @@ return class.create(function(ffmpeg)
       end
       local concatFile = self:createTempFile('concat.txt');
       concatFile:write(concatScript:toString());
-      table.insert(commands, self:computeArguments(filename, {'-c', 'copy'}, concatFile:getPath(), {'-f', 'concat', '-safe', '0'}))
+      table.insert(commands, self:computeArguments(filename, {'-c', 'copy', '-map', '0'}, concatFile:getPath(), {'-f', 'concat', '-safe', '0'}))
     end
     return commands
   end
