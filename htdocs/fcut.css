@@ -108,6 +108,7 @@ div.overlay:hover {
   cursor: pointer;
   padding-left: 1%;
   height: 2rem;
+  overflow-x: hidden;
 }
 span.part {
   height: 0.8rem;
@@ -136,4 +137,23 @@ div.console {
 div.console > pre {
   font-size: 0.9rem;
   margin: 0px;
+}
+
+div.splash {
+  position: absolute;
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  background-color: inherit;
+  font-size: 1.8rem;
+  vertical-align: middle;
+  text-align: center;
+  z-index: 1000;
+}
+:not(.theme-boot) > div.splash {
+  display: none;
+}
+
+input[type="checkbox"] {
+  transform: scale(1.25);
 }

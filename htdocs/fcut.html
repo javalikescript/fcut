@@ -15,7 +15,8 @@
   <script src="page.js" type="text/javascript"></script>
   <script src="FileChooser.js" type="text/javascript"></script>
   <script src="fcut-utils.js" type="text/javascript"></script>
-</head><body>
+</head><body class="theme-boot">
+  <div class="splash">...</div>
   <div id="app" tabindex="0" v-on:keyup="pages.dispatchKey($event)">
     <page name="home">
       <div class="padded">
@@ -139,7 +140,25 @@
           <button v-on:click="pages.navigateTo('console')" title="Show output"><i class="fas fa-terminal"></i></button>
         </div>
         <h2>Export</h2>
-        <div v-if="!exportId">
+        <div v-if="exportId === '$'">
+          <p v-if="logExitCode > 0">{{ 'Export failed with exit code ' + logExitCode }}</p>
+          <p v-else>Export completed !</p>
+          <div class="button-bar">
+            <button v-on:click="exportId = false" title="Dismiss export status"><i class="fas fa-times"></i> Ok</button>
+          </div>
+        </div>
+        <div v-else-if="exportId">
+          <p>Exported time: {{ formatHMS(Math.floor(logTime)) }}</p>
+          <p>Total time: {{ formatHMS(Math.floor(logDuration)) }}</p>
+          <p v-if="logPartIndex <= logPartCount">Part: {{ '' + logPartIndex + ' / ' + logPartCount }}</p>
+          <p v-else>Concat parts</p>
+          <div class="button-bar">
+            <progress style="width: 80%; height: 2rem;" max="1000" v-bind:value="logPermil"></progress>
+            <br /><br />
+            <button v-on:click="stopExport()" title="Cancel export"><i class="fas fa-ban"></i> Cancel</button>
+          </div>
+        </div>
+        <div v-else>
           <div class="input-bar">
             <label>Format:</label>
             <select v-model="exportFormat" title="Format">
@@ -209,8 +228,22 @@
             </select>
           </div>
           <div class="input-bar">
-            <input type="checkbox" v-model="exportEnableSubtitle" />
-            <label>Enable Subtitle</label>
+            <label>Subtitle Codec:</label>
+            <select v-model="exportSubtitleCodec" title="Select Subtitle Codec">
+              <option value="-">disable</option>
+              <option value="copy">copy</option>
+              <option value="ass">ASS (Advanced SSA) subtitle (decoders: ssa ass ) (encoders: ssa ass )</option>
+              <option value="dvb_subtitle">DVB subtitles (decoders: dvbsub ) (encoders: dvbsub )</option>
+              <option value="dvd_subtitle">DVD subtitles (decoders: dvdsub ) (encoders: dvdsub )</option>
+              <option value="mov_text">MOV text</option>
+              <option value="subrip">SubRip subtitle (decoders: srt subrip ) (encoders: srt subrip )</option>
+              <option value="text">raw UTF-8 text</option>
+              <option value="webvtt">WebVTT subtitle</option>
+              <option value="xsub">XSUB</option>
+            </select>
+          </div>
+          <div class="input-bar">
+            <label><input type="checkbox" v-model="exportMapAllStreams" /> Map all streams</label>
           </div>
           <br />
           <div class="bar-flex-row">
@@ -221,17 +254,6 @@
           <br />
           <div class="button-bar">
             <button v-bind:disabled="parts.length === 0" v-on:click="startExport()"><i class="fas fa-cogs"></i> Export</button>
-          </div>
-        </div>
-        <div v-if="exportId">
-          <p>Exported time: {{ formatHMS(Math.floor(logTime)) }}</p>
-          <p>Total time: {{ formatHMS(Math.floor(logDuration)) }}</p>
-          <p v-if="logPartIndex <= logPartCount">Part: {{ '' + logPartIndex + ' / ' + logPartCount }}</p>
-          <p v-else>Concat parts</p>
-          <div class="button-bar">
-            <progress style="width: 80%; height: 2rem;" max="1000" v-bind:value="logPermil"></progress>
-            <br /><br />
-            <button v-on:click="stopExport()" title="Cancel export"><i class="fas fa-ban"></i> Cancel</button>
           </div>
         </div>
       </div>
@@ -287,5 +309,6 @@
       </div>
     </page>
   </div>
-  <script src="fcut.js" type="text/javascript"></script>
-</body></html>
+</body>
+<script src="fcut.js" type="text/javascript"></script>
+</html>

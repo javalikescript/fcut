@@ -1,6 +1,7 @@
 
 var partRegExp = /^\n -- starting command ([0-9]+)\/([0-9]+)\s/;
 var timeRegExp = /^frame=.*\stime=([0-9:.]+)\s/;
+var endRegExp = /^\n -- exit code ([0-9]+)\s/;
 
 var DEFAULT_DESTINATION_FILENAME = 'fcut-out.mp4';
 var DEFAULT_PROJECT_FILENAME = 'fcut-project.json';
@@ -37,7 +38,8 @@ var vm = new Vue({
     exportFormat: 'mp4',
     exportVideoCodec: 'copy',
     exportAudioCodec: 'copy',
-    exportEnableSubtitle: false,
+    exportSubtitleCodec: '-',
+    exportMapAllStreams: true,
     duration: 0,
     parts: [],
     partIndex: 0,
@@ -53,6 +55,7 @@ var vm = new Vue({
     logPartCount: 0,
     logDuration: 0,
     logPermil: 0,
+    logExitCode: -1,
     keepFileChooserPath: false,
     messageTitle: '',
     messageLines: []
@@ -376,7 +379,6 @@ var vm = new Vue({
           "Content-Type": "text/plain"
         },
         body: this.exportId
-      }).then(function() {
       });
     },
     logMessage: function(content) {
@@ -399,6 +401,11 @@ var vm = new Vue({
             this.logCompletedTime = this.logTime;
           } else {
             this.logCompletedTime = 0;
+          }
+        } else {
+          found = endRegExp.exec(content);
+          if (found) {
+            this.logExitCode = parseInt(found[1], 10);
           }
         }
       }
@@ -425,21 +432,26 @@ var vm = new Vue({
         return;
       }
       var options = [];
-      if (this.exportFormat !== '-') {
+      if (this.exportMapAllStreams) {
+        options.push('-map', '0');
+      }
+      if ((this.exportFormat !== '-') && (this.exportFormat !== '')) {
         options.push('-f', this.exportFormat);
       }
-      if (this.exportVideoCodec !== '-') {
-        options.push('-vcodec', this.exportVideoCodec);
-      } else {
+      if (this.exportVideoCodec === '-') {
         options.push('-vn');
+      } else if (this.exportVideoCodec !== '') {
+        options.push('-vcodec', this.exportVideoCodec);
       }
-      if (this.exportAudioCodec !== '-') {
-        options.push('-acodec', this.exportAudioCodec);
-      } else {
+      if (this.exportAudioCodec === '-') {
         options.push('-an');
+      } else if (this.exportAudioCodec !== '') {
+        options.push('-acodec', this.exportAudioCodec);
       }
-      if (!this.exportEnableSubtitle) {
+      if (this.exportSubtitleCodec === '-') {
         options.push('-sn');
+      } else if (this.exportSubtitleCodec !== '') {
+        options.push('-scodec', this.exportSubtitleCodec);
       }
       var request = {
         filename: this.destinationFilename,
@@ -454,6 +466,7 @@ var vm = new Vue({
       this.logTime = 0;
       this.logCompletedTime = 0;
       this.logPermil = 0;
+      this.logExitCode = -1;
       var that = this;
       return checkFile(this.destinationFilename).catch(function(filename) {
         return that.showMessage('The file exists.\n' + filename + '\nDo you want to overwrite?');
@@ -474,7 +487,7 @@ var vm = new Vue({
           that.logMessage(event.data);
         };
         webSocket.onclose = function() {
-          that.exportId = false;
+          that.exportId = '$';
         };
       });
     },
@@ -564,3 +577,5 @@ var vm = new Vue({
 });
 
 vm.loadConfig(true);
+
+document.getElementsByTagName('body')[0].setAttribute('class', 'theme-dark');

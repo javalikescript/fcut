@@ -2,8 +2,6 @@
 
 Fast Cut allows to visually cut and join videos then export them losslessly.
 
-> :warning: The project is still experimental.
-
 The main purposes are to
 * join camcorder footages and
 * clean a recording from the commercial breaks.
