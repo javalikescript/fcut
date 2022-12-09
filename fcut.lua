@@ -85,7 +85,13 @@ local config = tables.createArgumentTable(arg, {
   helpPath = 'help',
   configPath = 'config',
   emptyPath = 'config',
-  schema = CONFIG_SCHEMA
+  schema = CONFIG_SCHEMA,
+  aliases = {
+    h = 'help',
+    ll = 'loglevel',
+    p = 'project',
+    s = 'source',
+  },
 });
 
 -- Apply configured log level
@@ -209,9 +215,11 @@ local function enqueueCommand(args, id, outputFile)
 end
 
 local function endExport(exportContext, webSocket, exitCode)
-  exportContext.exitCode = exitCode
-  webSocket:close()
-  Map.deleteValues(exportContexts, exportContext)
+  return webSocket:sendTextMessage('\n -- exit code '..tostring(exitCode)..' ------\n\n'):finally(function()
+    logger:info('end export')
+    Map.deleteValues(exportContexts, exportContext)
+    return webSocket:close()
+  end)
 end
 
 local function startExportCommand(exportContext, webSocket, index)
@@ -331,6 +339,17 @@ local httpContexts = {
         exportContexts[exportId] = nil
       end
     end,
+    ['getExport?method=POST'] = function(exchange)
+      local exportId = exchange:getRequest():getBody()
+      local exportContext = exportContexts[exportId]
+      if exportContext then
+        return {
+          commands = exportContext.commands,
+        }
+      end
+      HttpExchange.notFound(exchange, 'Export not found')
+      return false
+    end,
     ['export(requestJson)?method=POST&Content-Type=application/json'] = function(exchange, parameters)
       local commands = ffmpeg:createCommands(parameters.filename, parameters.parts, parameters.options or {}, parameters.seekDelayMs)
       local exportId = strings.formatInteger(system.currentTimeMillis(), 64)
@@ -356,6 +375,7 @@ local httpContexts = {
       end
       table.insert(header, '')
       webSocket:sendTextMessage(table.concat(header, '\n'))
+      logger:info('start export %s', exportId)
       startExportCommand(exportContext, webSocket, 1)
     end
   }),
