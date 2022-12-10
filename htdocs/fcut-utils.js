@@ -199,6 +199,17 @@ function readFile(filename, asJson) {
   });
 }
 
+function getJson(response) {
+  return response.json();
+}
+
+function rejectIfNotOk(response) {
+  if (response.ok) {
+    return response;
+  }
+  return Promise.reject(response.statusText);
+}
+
 function hashString(s) {
   var h = 0;
   if (typeof s !== 'string') {
@@ -209,4 +220,20 @@ function hashString(s) {
     h |= 0;
   }
   return h;
+}
+
+function isObject(obj) {
+  return (obj !== null) && (typeof obj === 'object');
+}
+
+function copyFields(target, source, fields) {
+  if (isObject(target) && isObject(source) && Array.isArray(fields)) {
+    for (var i = 0; i < fields.length; i++) {
+      var field = fields[i];
+      if (source.hasOwnProperty(field)) {
+        target[field] = source[field];
+      }
+    }
+  }
+  return target;
 }

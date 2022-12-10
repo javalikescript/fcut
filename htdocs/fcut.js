@@ -6,6 +6,8 @@ var endRegExp = /^\n -- exit code ([0-9]+)\s/;
 var DEFAULT_DESTINATION_FILENAME = 'fcut-out.mp4';
 var DEFAULT_PROJECT_FILENAME = 'fcut-project.json';
 
+var EXPORTED_FIELDS = ['destinationFilename', 'projectFilename', 'aspectRatio', 'exportFormat', 'exportVideoCodec', 'exportAudioCodec', 'exportSubtitleCodec', 'exportMapAllStreams', 'time'];
+
 function updatePart(part) {
   if (typeof part === 'object') {
     var u = hashString(part.sourceId + (part.from | 0).toString(16));
@@ -93,9 +95,7 @@ var vm = new Vue({
             file: filename,
             extention: extention
           })
-        }).then(function(response) {
-          return response.json();
-        }).then(function(filenames) {
+        }).then(getJson).then(function(filenames) {
           if (filenames && (filenames.length > 0)) {
             if (multiple) {
               return filenames;
@@ -139,11 +139,10 @@ var vm = new Vue({
     },
     loadConfig: function(boot) {
       var that = this;
-      return Promise.all([fetch('config/').then(function(response) {
-        return response.json();
-      }), fetch('/rest/checkFFmpeg', { method: 'POST' }).then(function(response) {
-        return response.json();
-      })]).then(function(values) {
+      return Promise.all([
+        fetch('config/').then(getJson),
+        fetch('/rest/checkFFmpeg', { method: 'POST' }).then(getJson)
+      ]).then(function(values) {
         var config = values[0];
         var checkFFmpeg = values[1];
         //console.info('config', config, 'checkFFmpeg', checkFFmpeg);
@@ -171,9 +170,7 @@ var vm = new Vue({
     },
     openSourceById: function(sourceId) {
       var that = this;
-      return fetch('source/' + sourceId + '/info.json').then(function(response) {
-        return response.json();
-      }).then(function(info) {
+      return fetch('source/' + sourceId + '/info.json').then(getJson).then(function(info) {
         //console.info('info', info);
         that.sources[sourceId] = info;
         return sourceId;
@@ -501,6 +498,7 @@ var vm = new Vue({
         parts: this.parts,
         sources: sources
       };
+      copyFields(project, this, EXPORTED_FIELDS);
       return project;
     },
     loadProjectFromJson: function(project) {
@@ -515,6 +513,7 @@ var vm = new Vue({
         });
       })).then(function() {
         that.parts = project.parts;
+        copyFields(that, project, EXPORTED_FIELDS);
         that.refreshParts();
         that.navigateTo(0);
       });
