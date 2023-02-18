@@ -19,7 +19,7 @@ local FileHttpHandler = require('jls.net.http.handler.FileHttpHandler')
 local RestHttpHandler = require('jls.net.http.handler.RestHttpHandler')
 local ZipFileHttpHandler = require('jls.net.http.handler.ZipFileHttpHandler')
 local TableHttpHandler = require('jls.net.http.handler.TableHttpHandler')
-local WebSocketUpgradeHandler = require('jls.net.http.ws').WebSocketUpgradeHandler
+local WebSocketUpgradeHandler = require('jls.net.http.WebSocket').UpgradeHandler
 
 -- Project required modules
 
@@ -87,6 +87,8 @@ local config = tables.createArgumentTable(arg, {
   emptyPath = 'config',
   schema = CONFIG_SCHEMA,
   aliases = {
+    ffmpeg = 'ffmpeg.ffmpeg',
+    ffprobe = 'ffmpeg.ffprobe',
     h = 'help',
     ll = 'loglevel',
     p = 'project',
@@ -133,7 +135,7 @@ end
 logger:info('Cache directory is '..cacheDir:getPath())
 
 local ffmpeg = Ffmpeg:new(cacheDir)
-ffmpeg:configure(config)
+ffmpeg:configure(config.ffmpeg)
 
 -- Application local functions
 
@@ -218,6 +220,7 @@ local function endExport(exportContext, webSocket, exitCode)
   return webSocket:sendTextMessage('\n -- exit code '..tostring(exitCode)..' ------\n\n'):finally(function()
     logger:info('end export')
     Map.deleteValues(exportContexts, exportContext)
+    ffmpeg:deleteTempFiles()
     return webSocket:close()
   end)
 end
@@ -292,6 +295,7 @@ local httpContexts = {
     end,
     ['checkFFmpeg?method=POST'] = function(exchange)
       local status, reason = ffmpeg:check()
+      -- TODO get ffmpeg version
       return {
         status = status,
         reason = reason,
@@ -351,7 +355,7 @@ local httpContexts = {
       return false
     end,
     ['export(requestJson)?method=POST&Content-Type=application/json'] = function(exchange, parameters)
-      local commands = ffmpeg:createCommands(parameters.filename, parameters.parts, parameters.options or {}, parameters.seekDelayMs)
+      local commands = ffmpeg:createCommands(parameters.filename, parameters.parts, parameters.options or {}, parameters.parameters or {})
       local exportId = strings.formatInteger(system.currentTimeMillis(), 64)
       logger:info('export '..exportId..' '..tostring(#commands)..' command(s)')
       exportContexts[exportId] = {
@@ -386,7 +390,7 @@ local httpContexts = {
 if config.webview.disable then
   local httpServer = require('jls.net.http.HttpServer'):new()
   httpServer:bind(config.webview.address, config.webview.port):next(function()
-    httpServer:createContexts(httpContexts)
+    httpServer:addContexts(httpContexts)
     if config.webview.port == 0 then
       print('FCut HTTP Server available at http://localhost:'..tostring(select(2, httpServer:getAddress())))
     end
@@ -409,7 +413,7 @@ else
     url = url..'extensions/'..config.extension..'/'
   end
   require('jls.util.WebView').open(url, {
-    title = 'Fast Cut (Preview)',
+    title = 'Fast Cut',
     resizable = true,
     bind = true,
     width = config.webview.width,

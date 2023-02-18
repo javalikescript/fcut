@@ -4,7 +4,7 @@ local Promise = require('jls.lang.Promise')
 local StringBuffer = require('jls.lang.StringBuffer')
 local File = require('jls.io.File')
 local strings = require('jls.util.strings')
-local TableList = require('jls.util.TableList')
+local List = require('jls.util.List')
 local LocalDateTime = require('jls.util.LocalDateTime')
 
 local function getExecutableName(name)
@@ -51,6 +51,7 @@ return class.create(function(ffmpeg)
         self.ffprobePath = getExecutableName('ffprobe')
       end
     end
+    self.seekDelayMs = options.seekDelay or 0
   end
 
   function ffmpeg:check()
@@ -93,24 +94,30 @@ return class.create(function(ffmpeg)
   function ffmpeg:computeArguments(destFilename, destOptions, srcFilename, srcOptions, globalOptions)
     local args = {self.ffmpegPath, '-hide_banner'}
     if globalOptions then
-      TableList.concat(args, globalOptions)
+      List.concat(args, globalOptions)
     end
     if srcOptions then
-      TableList.concat(args, srcOptions)
+      List.concat(args, srcOptions)
     end
     if srcFilename then
-      TableList.concat(args, '-i', srcFilename)
+      if type(srcFilename) == 'table' then
+        for _, filename in ipairs(srcFilename) do
+          List.concat(args, '-i', filename)
+        end
+      else
+        List.concat(args, '-i', srcFilename)
+      end
     end
     if destOptions then
-      TableList.concat(args, destOptions)
+      List.concat(args, destOptions)
     end
     if destFilename then
-      TableList.concat(args, '-y', destFilename)
+      List.concat(args, '-y', destFilename)
     end
     return args
   end
 
-  function ffmpeg:createCommand(part, filename, options, seekDelay)
+  function ffmpeg:createCommand(part, filename, options, parameters)
     --[[
       '-ss position (input/output)'
       When used as an input option (before -i), seeks in this input file to position.
@@ -132,25 +139,25 @@ return class.create(function(ffmpeg)
     local srcOptions = {}
     local destOptions = {}
     if part.from ~= nil then
-      local delay = seekDelay or 0
+      local delay = (parameters and parameters.seekDelay) or self.seekDelayMs or 0
       if (delay >= 0) and (delay < part.from) then
-        TableList.concat(srcOptions, '-ss', formatTime(part.from - delay))
-        TableList.concat(destOptions, '-ss', math.floor(delay))
+        List.concat(srcOptions, '-ss', formatTime(part.from - delay))
+        List.concat(destOptions, '-ss', math.floor(delay))
       elseif delay == -1 then
-        TableList.concat(srcOptions, '-ss', formatTime(part.from))
+        List.concat(srcOptions, '-ss', formatTime(part.from))
       else
-        TableList.concat(destOptions, '-ss', formatTime(part.from))
+        List.concat(destOptions, '-ss', formatTime(part.from))
       end
     end
     if part.to ~= nil then
       if part.from ~= nil then
-        TableList.concat(destOptions, '-t', formatTime(part.to - part.from))
-        --TableList.concat(destOptions, '-to', formatTime(part.to))
+        List.concat(destOptions, '-t', formatTime(part.to - part.from))
+        --List.concat(destOptions, '-to', formatTime(part.to))
       else
-        TableList.concat(destOptions, '-t', formatTime(part.to))
+        List.concat(destOptions, '-t', formatTime(part.to))
       end
     end
-    TableList.concat(destOptions, options)
+    List.concat(destOptions, options)
     local sourceFile = self.sources[part.sourceId]
     return self:computeArguments(filename, destOptions, sourceFile:getPath(), srcOptions)
   end
@@ -159,17 +166,30 @@ return class.create(function(ffmpeg)
     return File:new(self.cacheDir, filename)
   end
 
-  function ffmpeg:createCommands(filename, parts, destOptions, seekDelayMs)
+  function ffmpeg:deleteTempFiles()
+    local tmpFiles = self.cacheDir:listFiles(function(file)
+      return file:isFile() and (file:getExtension() == 'tmp')
+    end)
+    for _, file in ipairs(tmpFiles) do
+      file:delete()
+    end
+  end
+
+  function ffmpeg:createCommands(destFilename, parts, destOptions, parameters)
     local commands = {}
+    local filename = destFilename
+    if parameters.subtitles then
+      filename = self:createTempFile('full.tmp'):getPath()
+    end
     if #parts == 1 then
-      table.insert(commands, self:createCommand(parts[1], filename, destOptions, seekDelayMs))
+      table.insert(commands, self:createCommand(parts[1], filename, destOptions, parameters))
     elseif #parts > 1 then
       local concatScript = StringBuffer:new()
       concatScript:append('# fcut')
       for i, part in ipairs(parts) do
         local partName = 'part_'..tostring(i)..'.tmp'
         local outFilename = self:createTempFile(partName):getPath()
-        table.insert(commands, self:createCommand(part, outFilename, destOptions, seekDelayMs))
+        table.insert(commands, self:createCommand(part, outFilename, destOptions, parameters))
         local concatPartname = string.gsub(outFilename, '[\\+]', '/')
         --local concatPartname = partName -- to be safe
         concatScript:append('\nfile ', concatPartname)
@@ -177,6 +197,9 @@ return class.create(function(ffmpeg)
       local concatFile = self:createTempFile('concat.txt');
       concatFile:write(concatScript:toString());
       table.insert(commands, self:computeArguments(filename, {'-c', 'copy', '-map', '0'}, concatFile:getPath(), {'-f', 'concat', '-safe', '0'}))
+    end
+    if parameters.subtitles then
+      table.insert(commands, self:computeArguments(destFilename, {'-c', 'copy', '-c:s', 'mov_text', '-map', '0'}, List.concat({}, filename, parameters.subtitles)))
     end
     return commands
   end
@@ -217,9 +240,9 @@ return class.create(function(ffmpeg)
     local time = LocalDateTime:new():plusSeconds(sec or 0):toTimeString()
     local args = {self.ffmpegPath, '-hide_banner', '-v', '0', '-ss', time, '-i', sourceFile:getPath(), '-f', 'mjpeg', '-vcodec', 'mjpeg', '-vframes', '1', '-an'}
     if width and height then
-      TableList.concat(args, '-s', tostring(width)..'x'..tostring(height))
+      List.concat(args, '-s', tostring(width)..'x'..tostring(height))
     end
-    TableList.concat(args, '-y', file:getPath())
+    List.concat(args, '-y', file:getPath())
     return args
   end
 

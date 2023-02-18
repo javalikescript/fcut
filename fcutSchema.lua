@@ -47,13 +47,26 @@ return {
       maximum = 32,
     },
     ffmpeg = {
-      title = 'The ffmpeg path',
-      type = 'string',
-      default = (require('jls.lang.system').isWindows() and 'ffmpeg\\ffmpeg.exe' or '/usr/bin/ffmpeg'),
-    },
-    ffprobe = {
-      title = 'The ffprobe path, the default value is computed from the ffmpeg path',
-      type = 'string',
+      type = 'object',
+      additionalProperties = false,
+      properties = {
+        ffmpeg = {
+          title = 'The ffmpeg path',
+          type = 'string',
+          default = (require('jls.lang.system').isWindows() and 'ffmpeg\\ffmpeg.exe' or '/usr/bin/ffmpeg'),
+        },
+        ffprobe = {
+          title = 'The ffprobe path, the default value is computed from the ffmpeg path',
+          type = 'string',
+        },
+        seekDelay = {
+          title = 'Seek delay in milli seconds',
+          type = 'integer',
+          default = 0,
+          minimum = -2,
+          maximum = 60000,
+        },
+      }
     },
     loglevel = {
       title = 'The log level',
