@@ -41,15 +41,22 @@ dist-copy-windows:
 	cp -u $(LUACLIBS)/WebView2Loader.dll $(FCUT_DIST_CLUA)/
 	cp -u fcut.bat $(FCUT_DIST)/
 
-dist-copy: dist-copy-$(PLAT)
+dist-copy-sha1:
+	cp -ru $(LUACLIBS)/sha1/ $(FCUT_DIST_LUA)/
+	cp -u $(LUACLIBS)/sha1.lua $(FCUT_DIST_LUA)/
+
+dist-make-sha1:
+	mkdir $(FCUT_DIST_LUA)/sha1
+	cp -u $(LUACLIBS)/../sha1/src/sha1/*.lua $(FCUT_DIST_LUA)/sha1/
+	printf "return require('sha1.init')" > $(FCUT_DIST_LUA)/sha1.lua
+
+dist-copy: dist-copy-$(PLAT) dist-make-sha1
 	cp -u $(LUACLIBS)/lua$(EXE) $(FCUT_DIST_CLUA)/
 	cp -u $(LUACLIBS)/cjson.$(SO) $(FCUT_DIST_CLUA)/
 	cp -u $(LUACLIBS)/luv.$(SO) $(FCUT_DIST_CLUA)/
 	cp -u $(LUACLIBS)/zlib.$(SO) $(FCUT_DIST_CLUA)/
 	cp -u $(LUACLIBS)/webview.$(SO) $(FCUT_DIST_CLUA)/
-	cp -ru $(LUACLIBS)/sha1/ $(FCUT_DIST_LUA)/
 	cp -u $(LUACLIBS)/XmlParser.lua $(FCUT_DIST_LUA)/
-	cp -u $(LUACLIBS)/sha1.lua $(FCUT_DIST_LUA)/
 	cp -ru $(LUACLIBS)/jls/ $(FCUT_DIST_LUA)/
 	cp -u *.lua $(FCUT_DIST_LUA)/
 	mv $(FCUT_DIST_LUA)/fcut.lua $(FCUT_DIST)/
