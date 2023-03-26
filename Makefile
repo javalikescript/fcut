@@ -87,7 +87,7 @@ dist.zip:
 dist-archive: dist dist$(ZIP)
 
 dist-full-archive release: dist-full dist$(ZIP)
-	mv $(FCUT_DIST)/fcut$(RELEASE_NAME).zip $(FCUT_DIST)/fcut-ffmpeg$(RELEASE_NAME).zip
+	mv $(FCUT_DIST)/fcut$(RELEASE_NAME)$(ZIP) $(FCUT_DIST)/fcut-ffmpeg$(RELEASE_NAME)$(ZIP)
 
 ffmpeg.zip:
 	cd ffmpeg && zip -q -r ../dist/ffmpeg-$(ARCH)-$(PLAT).zip *
