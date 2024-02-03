@@ -41,22 +41,13 @@ dist-copy-windows:
 	cp -u $(LUACLIBS)/WebView2Loader.dll $(FCUT_DIST_CLUA)/
 	cp -u fcut.bat $(FCUT_DIST)/
 
-dist-copy-sha1:
-	cp -ru $(LUACLIBS)/sha1/ $(FCUT_DIST_LUA)/
-	cp -u $(LUACLIBS)/sha1.lua $(FCUT_DIST_LUA)/
-
-dist-make-sha1:
-	mkdir $(FCUT_DIST_LUA)/sha1
-	cp -u $(LUACLIBS)/../sha1/src/sha1/*.lua $(FCUT_DIST_LUA)/sha1/
-	printf "return require('sha1.init')" > $(FCUT_DIST_LUA)/sha1.lua
-
-dist-copy: dist-copy-$(PLAT) dist-make-sha1
+dist-copy: dist-copy-$(PLAT)
 	cp -u $(LUACLIBS)/lua$(EXE) $(FCUT_DIST_CLUA)/
 	cp -u $(LUACLIBS)/cjson.$(SO) $(FCUT_DIST_CLUA)/
 	cp -u $(LUACLIBS)/luv.$(SO) $(FCUT_DIST_CLUA)/
 	cp -u $(LUACLIBS)/zlib.$(SO) $(FCUT_DIST_CLUA)/
 	cp -u $(LUACLIBS)/webview.$(SO) $(FCUT_DIST_CLUA)/
-	cp -u $(LUACLIBS)/XmlParser.lua $(FCUT_DIST_LUA)/
+	cp -u $(LUACLIBS)/lxp.$(SO) $(FCUT_DIST_CLUA)/
 	cp -ru $(LUACLIBS)/jls/ $(FCUT_DIST_LUA)/
 	cp -u *.lua $(FCUT_DIST_LUA)/
 	mv $(FCUT_DIST_LUA)/fcut.lua $(FCUT_DIST)/
@@ -84,9 +75,9 @@ dist.tar.gz:
 dist.zip:
 	cd $(FCUT_DIST) && zip -r fcut$(RELEASE_NAME).zip *
 
-dist-archive: dist dist$(ZIP)
+dist-archive release: dist dist$(ZIP)
 
-dist-full-archive release: dist-full dist$(ZIP)
+dist-full-archive: dist-full dist$(ZIP)
 	mv $(FCUT_DIST)/fcut$(RELEASE_NAME)$(ZIP) $(FCUT_DIST)/fcut-ffmpeg$(RELEASE_NAME)$(ZIP)
 
 ffmpeg.zip:
