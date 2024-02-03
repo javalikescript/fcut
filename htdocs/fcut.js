@@ -1,7 +1,10 @@
 
 var partRegExp = /^\n -- starting command ([0-9]+)\/([0-9]+)\s/;
-var timeRegExp = /^frame=.*\stime=([0-9:.]+)\s/;
+var timeRegExp = /size=.*\s+time=([0-9:.]+)\s+bitrate=/;
 var endRegExp = /^\n -- exit code ([0-9]+)\s/;
+
+// frame=64445 fps=16111 q=-1.0 size= 1382400kB time=00:42:58.29 bitrate=4392.3kbits/s speed= 645x    
+// size= 1989376kB time=01:01:42.07 bitrate=4402.1kbits/s speed= 617x    
 
 var DEFAULT_DESTINATION_FILENAME = 'fcut-out.mp4';
 var DEFAULT_PROJECT_FILENAME = 'fcut-project.json';
