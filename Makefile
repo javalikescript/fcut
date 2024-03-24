@@ -24,12 +24,12 @@ EXE := $(EXE_$(PLAT))
 MAIN_MK := $(MK_$(PLAT))
 ZIP := $(ZIP_$(PLAT))
 
-RELEASE_FILES ?= fcut$(EXE) README.md
+RELEASE_FILES ?= fcut$(EXE) README.md licenses.txt
 
 STATIC_FLAGS_windows=lua/src/wlua.res -mwindows
 STATIC_FLAGS_linux=
 
-release: bin release$(ZIP)
+release: bin licenses release$(ZIP)
 
 release-full:
 	$(MAKE) release RELEASE_FILES="$(RELEASE_FILES) ffmpeg"
@@ -39,6 +39,9 @@ show:
 	@echo TARGET_NAME: $(TARGET_NAME)
 	@echo RELEASE_DATE: $(RELEASE_DATE)
 	@echo RELEASE_NAME: $(RELEASE_NAME)
+
+licenses:
+	cp -u $(LUACLIBS)/licenses.txt .
 
 bin:
 	$(MAKE) -C $(LUACLIBS) OPENSSL_LIBNAMES= OPENSSL_LIBS= \
