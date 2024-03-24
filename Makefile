@@ -1,10 +1,13 @@
-LUACLIBS := ../luaclibs/dist
+LUACLIBS := ../luaclibs
+LUACLIBS_DIST := $(LUACLIBS)/dist
 FCUT_DIST := dist
 FCUT_DIST_CLUA := $(FCUT_DIST)/bin
 FCUT_DIST_LUA := $(FCUT_DIST)/lua
 
-PLAT ?= $(shell grep ^platform $(LUACLIBS)/versions.txt | cut -f2)
-TARGET_NAME ?= $(shell grep ^target $(LUACLIBS)/versions.txt | cut -f2)
+FCUT_REL := ../fcut
+
+PLAT ?= $(shell grep ^platform $(LUACLIBS_DIST)/versions.txt | cut -f2)
+TARGET_NAME ?= $(shell grep ^target $(LUACLIBS_DIST)/versions.txt | cut -f2)
 RELEASE_DATE = $(shell date '+%Y%m%d')
 RELEASE_NAME ?= -$(TARGET_NAME).$(RELEASE_DATE)
 
@@ -21,7 +24,15 @@ EXE := $(EXE_$(PLAT))
 MAIN_MK := $(MK_$(PLAT))
 ZIP := $(ZIP_$(PLAT))
 
-main: dist-archive
+RELEASE_FILES ?= fcut$(EXE) README.md
+
+STATIC_FLAGS_windows=lua/src/wlua.res -mwindows
+STATIC_FLAGS_linux=
+
+release: bin release$(ZIP)
+
+release-full:
+	$(MAKE) release RELEASE_FILES="$(RELEASE_FILES) ffmpeg"
 
 show:
 	@echo PLAT: $(PLAT)
@@ -29,60 +40,17 @@ show:
 	@echo RELEASE_DATE: $(RELEASE_DATE)
 	@echo RELEASE_NAME: $(RELEASE_NAME)
 
-dist-copy-linux:
-	-cp -u $(LUACLIBS)/linux.$(SO) $(FCUT_DIST_CLUA)/
-	cp -u fcut.sh $(FCUT_DIST)/
+bin:
+	$(MAKE) -C $(LUACLIBS) OPENSSL_LIBNAMES= OPENSSL_LIBS= \
+		STATIC_RESOURCES="-R $(FCUT_REL)/assets $(FCUT_REL)/htdocs -l $(FCUT_REL)/fcut.lua $(FCUT_REL)/fcutSchema.lua $(FCUT_REL)/Ffmpeg.lua $(FCUT_REL)/FileChooser.lua" \
+		LUAJLS=luajls "STATIC_EXECUTE=require('fcut')" \
+		STATIC_FLAGS="$(STATIC_FLAGS_$(PLAT))" static-full
+	mv $(LUACLIBS)/dist/luajls$(EXE) fcut$(EXE)
 
-dist-copy-windows:
-	-cp -u $(LUACLIBS)/winapi.$(SO) $(FCUT_DIST_CLUA)/
-	-cp -u $(LUACLIBS)/win32.$(SO) $(FCUT_DIST_CLUA)/
-	cp -u $(LUACLIBS)/lua*.$(SO) $(FCUT_DIST_CLUA)/
-	-cp -u $(LUACLIBS)/wlua$(EXE) $(FCUT_DIST_CLUA)/
-	cp -u $(LUACLIBS)/WebView2Loader.dll $(FCUT_DIST_CLUA)/
-	cp -u fcut.bat $(FCUT_DIST)/
+release.tar.gz:
+	-rm fcut$(RELEASE_NAME).tar.gz
+	tar --group=jls --owner=jls -zcvf fcut$(RELEASE_NAME).tar.gz $(RELEASE_FILES)
 
-dist-copy: dist-copy-$(PLAT)
-	cp -u $(LUACLIBS)/lua$(EXE) $(FCUT_DIST_CLUA)/
-	cp -u $(LUACLIBS)/cjson.$(SO) $(FCUT_DIST_CLUA)/
-	cp -u $(LUACLIBS)/luv.$(SO) $(FCUT_DIST_CLUA)/
-	cp -u $(LUACLIBS)/zlib.$(SO) $(FCUT_DIST_CLUA)/
-	cp -u $(LUACLIBS)/webview.$(SO) $(FCUT_DIST_CLUA)/
-	cp -u $(LUACLIBS)/lxp.$(SO) $(FCUT_DIST_CLUA)/
-	cp -ru $(LUACLIBS)/jls/ $(FCUT_DIST_LUA)/
-	cp -u *.lua $(FCUT_DIST_LUA)/
-	mv $(FCUT_DIST_LUA)/fcut.lua $(FCUT_DIST)/
-	cp -ru htdocs/ $(FCUT_DIST)/
-	-rm -f assets.tmp.zip
-	cd assets/ && zip -r ../assets.tmp.zip *
-	mv assets.tmp.zip $(FCUT_DIST)/assets.zip
-
-dist-clean:
-	rm -rf $(FCUT_DIST)
-
-dist-prepare:
-	-mkdir $(FCUT_DIST)
-	mkdir $(FCUT_DIST_CLUA)
-	mkdir $(FCUT_DIST_LUA)
-
-dist: dist-clean dist-prepare dist-copy
-
-dist-full: dist
-	-cp -ru ffmpeg/ $(FCUT_DIST)/
-
-dist.tar.gz:
-	cd $(FCUT_DIST) && tar --group=jls --owner=jls -zcvf fcut$(RELEASE_NAME).tar.gz *
-
-dist.zip:
-	cd $(FCUT_DIST) && zip -r fcut$(RELEASE_NAME).zip *
-
-dist-archive release: dist dist$(ZIP)
-
-dist-full-archive: dist-full dist$(ZIP)
-	mv $(FCUT_DIST)/fcut$(RELEASE_NAME)$(ZIP) $(FCUT_DIST)/fcut-ffmpeg$(RELEASE_NAME)$(ZIP)
-
-ffmpeg.zip:
-	cd ffmpeg && zip -q -r ../dist/ffmpeg-$(ARCH)-$(PLAT).zip *
-
-ffmpeg-archive : ffmpeg$(ZIP)
-
-.PHONY: dist
+release.zip:
+	-rm fcut$(RELEASE_NAME).zip
+	zip -r fcut$(RELEASE_NAME).zip $(RELEASE_FILES)

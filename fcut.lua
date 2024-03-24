@@ -15,6 +15,7 @@ local Map = require('jls.util.Map')
 local List = require('jls.util.List')
 local HttpContext = require('jls.net.http.HttpContext')
 local HttpExchange = require('jls.net.http.HttpExchange')
+local ResourceHttpHandler = require('jls.net.http.handler.ResourceHttpHandler')
 local FileHttpHandler = require('jls.net.http.handler.FileHttpHandler')
 local RestHttpHandler = require('jls.net.http.handler.RestHttpHandler')
 local ZipFileHttpHandler = require('jls.net.http.handler.ZipFileHttpHandler')
@@ -256,11 +257,11 @@ end
 -- HTTP contexts used by the web application
 local httpContexts = {
   -- HTTP resources
-  ['/(.*)'] = FileHttpHandler:new(File:new(scriptDir, 'htdocs'), nil, 'fcut.html'),
+  ['/(.*)'] = ResourceHttpHandler:new('htdocs/', 'fcut.html'),
   -- Context to retrieve the configuration
   ['/config/(.*)'] = TableHttpHandler:new(config, nil, true),
   -- Assets HTTP resources directory or ZIP file
-  ['/assets/(.*)'] = assetsZip:isFile() and not assetsDir:isDirectory() and ZipFileHttpHandler:new(assetsZip) or FileHttpHandler:new(assetsDir),
+  ['/assets/(.*)'] = ResourceHttpHandler:new('assets/'),
   -- Context to retrieve and cache a movie image at a specific time
   ['/source/([^/]+)/(%d+%.?%d*)%.jpg'] = Map.assign(FileHttpHandler:new(cacheDir), {
     getPath = function(_, exchange)
