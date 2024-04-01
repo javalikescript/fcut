@@ -18,7 +18,6 @@ local HttpExchange = require('jls.net.http.HttpExchange')
 local ResourceHttpHandler = require('jls.net.http.handler.ResourceHttpHandler')
 local FileHttpHandler = require('jls.net.http.handler.FileHttpHandler')
 local RestHttpHandler = require('jls.net.http.handler.RestHttpHandler')
-local ZipFileHttpHandler = require('jls.net.http.handler.ZipFileHttpHandler')
 local TableHttpHandler = require('jls.net.http.handler.TableHttpHandler')
 local WebSocketUpgradeHandler = require('jls.net.http.WebSocket').UpgradeHandler
 
@@ -82,7 +81,7 @@ local function startProcess(command, outputFile, callback)
 end
 
 -- Extracts configuration from command line arguments
-local config = tables.createArgumentTable(arg, {
+local config = system.createArgumentTable({
   helpPath = 'help',
   configPath = 'config',
   emptyPath = 'config',
@@ -109,8 +108,6 @@ end
 
 local scriptFile = File:new(arg[0]):getAbsoluteFile()
 local scriptDir = scriptFile:getParentFile()
-local assetsDir = File:new(scriptDir, 'assets')
-local assetsZip = File:new(scriptDir, 'assets.zip')
 local extensionsDir = File:new(scriptDir, config.extensions)
 
 local commandQueue = {}

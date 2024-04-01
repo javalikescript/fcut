@@ -26,6 +26,7 @@ ZIP := $(ZIP_$(PLAT))
 
 RELEASE_FILES ?= fcut$(EXE) README.md licenses.txt
 
+LUAJLS=luajls
 STATIC_FLAGS_windows=lua/src/wlua.res -mwindows
 STATIC_FLAGS_linux=
 
@@ -44,16 +45,15 @@ licenses:
 	cp -u $(LUACLIBS)/licenses.txt .
 
 bin:
-	$(MAKE) -C $(LUACLIBS) OPENSSL_LIBNAMES= OPENSSL_LIBS= \
+	$(MAKE) -C $(LUACLIBS) STATIC_OPENSSL= \
 		STATIC_RESOURCES="-R $(FCUT_REL)/assets $(FCUT_REL)/htdocs -l $(FCUT_REL)/fcut.lua $(FCUT_REL)/fcutSchema.lua $(FCUT_REL)/Ffmpeg.lua $(FCUT_REL)/FileChooser.lua" \
-		LUAJLS=luajls "STATIC_EXECUTE=require('fcut')" \
-		STATIC_FLAGS="$(STATIC_FLAGS_$(PLAT))" static-full
-	mv $(LUACLIBS)/dist/luajls$(EXE) fcut$(EXE)
+		LUAJLS=$(LUAJLS) STATIC_FLAGS="$(STATIC_FLAGS_$(PLAT))" STATIC_EXECUTE="require('fcut')" STATIC_NAME=fcut static-full
+	mv $(LUACLIBS)/dist/fcut$(EXE) .
 
 release.tar.gz:
-	-rm fcut$(RELEASE_NAME).tar.gz
+	-rm -f fcut$(RELEASE_NAME).tar.gz
 	tar --group=jls --owner=jls -zcvf fcut$(RELEASE_NAME).tar.gz $(RELEASE_FILES)
 
 release.zip:
-	-rm fcut$(RELEASE_NAME).zip
+	-rm -f fcut$(RELEASE_NAME).zip
 	zip -r fcut$(RELEASE_NAME).zip $(RELEASE_FILES)
