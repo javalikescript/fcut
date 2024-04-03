@@ -53,7 +53,6 @@ return {
         ffmpeg = {
           title = 'The ffmpeg path',
           type = 'string',
-          default = (require('jls.lang.system').isWindows() and 'ffmpeg\\ffmpeg.exe' or '/usr/bin/ffmpeg'),
         },
         ffprobe = {
           title = 'The ffprobe path, the default value is computed from the ffmpeg path',

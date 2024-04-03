@@ -35,7 +35,7 @@ return class.create(function(ffmpeg)
   end
 
   function ffmpeg:configure(options)
-    local ffDir = File:new(options.ffmpeg)
+    local ffDir = File:new(options.ffmpeg or system.findExecutablePath('ffmpeg') or 'ffmpeg')
     if ffDir:isDirectory() then
       self.ffmpegPath = File:new(ffDir, getExecutableName('ffmpeg')):getPath()
     else
