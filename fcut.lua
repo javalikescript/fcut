@@ -319,7 +319,7 @@ local httpContexts = {
         lastModified = file:lastModified(),
       }
     end,
-    ['writeFile(requestJson)?method=POST&Content-Type=application/json'] = function(exchange, obj)
+    ['writeFile(requestJson)?method=POST&:Content-Type=application/json'] = function(exchange, obj)
       local f = File:new(obj.path)
       if not obj.overwrite and f:exists() then
         HttpExchange.forbidden(exchange, 'The file exists')
@@ -352,7 +352,7 @@ local httpContexts = {
       HttpExchange.notFound(exchange, 'Export not found')
       return false
     end,
-    ['export(requestJson)?method=POST&Content-Type=application/json'] = function(exchange, parameters)
+    ['export(requestJson)?method=POST&:Content-Type=application/json'] = function(exchange, parameters)
       local commands = ffmpeg:createCommands(parameters.filename, parameters.parts, parameters.options or {}, parameters.parameters or {})
       local exportId = strings.formatInteger(system.currentTimeMillis(), 64)
       logger:info('export '..exportId..' '..tostring(#commands)..' command(s)')
@@ -422,10 +422,10 @@ else
     local httpServer = webview:getHttpServer()
     logger:info('FCut HTTP Server available at http://localhost:%s/', (select(2, httpServer:getAddress())))
     httpServer:createContext('/webview/(.*)', RestHttpHandler:new({
-      ['fullscreen(requestJson)?method=POST&Content-Type=application/json'] = function(exchange, fullscreen)
+      ['fullscreen(requestJson)?method=POST&:Content-Type=application/json'] = function(exchange, fullscreen)
         webview:fullscreen(fullscreen == true);
       end,
-      ['selectFiles(requestJson)?method=POST&Content-Type=application/json'] = function(exchange, obj)
+      ['selectFiles(requestJson)?method=POST&:Content-Type=application/json'] = function(exchange, obj)
         if serialWorker then
           return serialWorker:process(obj)
         end
