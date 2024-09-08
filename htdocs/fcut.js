@@ -18,6 +18,9 @@ function updatePart(part) {
   }
   return part;
 }
+function parseSourceDuration(duration) {
+  return Math.floor(parseFloat(duration) - 1.1);
+}
 
 var vm = new Vue({
   el: '#app',
@@ -33,7 +36,7 @@ var vm = new Vue({
       time: true,
       cut: true,
       bsearch: true,
-      project: false
+      project: true
     },
     step: 1,
     period: 180,
@@ -45,6 +48,9 @@ var vm = new Vue({
     exportAudioCodec: 'copy',
     exportSubtitleCodec: '-',
     exportMapAllStreams: true,
+    exportUseOptions: false,
+    exportOptions: '',
+    exportSourceOptions: '',
     duration: 0,
     parts: [],
     partIndex: 0,
@@ -181,7 +187,7 @@ var vm = new Vue({
     },
     addSource: function(sourceId, beforeIndex) {
       var info = this.sources[sourceId];
-      var duration = Math.floor(parseFloat(info.format.duration) - 1.1);
+      var duration = parseSourceDuration(info.format.duration);
       var part = updatePart({
         sourceId: sourceId,
         duration: duration,
@@ -432,6 +438,14 @@ var vm = new Vue({
         return;
       }
       var options = [];
+      if (this.exportUseOptions) {
+        if (this.exportOptions) {
+          options = options.concat(this.exportOptions.split(' '));
+        }
+        if (this.exportSourceOptions) {
+          options = options.concat(this.exportSourceOptions.split(' '));
+        }
+      }
       if (this.exportMapAllStreams) {
         options.push('-map', '0');
       }
@@ -453,9 +467,26 @@ var vm = new Vue({
       } else if (this.exportSubtitleCodec !== '') {
         options.push('-scodec', this.exportSubtitleCodec);
       }
+      var parts = [];
+      for (var i = 0; i < this.parts.length; i++) {
+        var part = this.parts[i];
+        var sourceId = part.sourceId;
+        var info = this.sources[sourceId];
+        if (info) {
+          var duration = parseSourceDuration(info.format.duration);
+          var p = {sourceId: sourceId};
+          if (part.from > 0) {
+            p.from = part.from;
+          }
+          if (part.to > 0 && part.to < duration) {
+            p.to = part.to;
+          }
+          parts.push(p);
+        }
+      }
       var request = {
         filename: this.destinationFilename,
-        parts: this.parts,
+        parts: parts,
         options: options
       };
       this.logBuffer = '';
@@ -541,6 +572,21 @@ var vm = new Vue({
           writeFile(filename, content, true);
         });
       });
+    },
+    closeProject: function() {
+      this.sources = [];
+      this.parts = [];
+      this.previewSrc = 'roll.png';
+      this.partIndex = 0;
+      this.partTime = 0;
+      this.partEndTime = 0;
+      this.partInfo = {};
+      this.canJoin = false;
+      this.time = 0;
+      this.destinationFilename = DEFAULT_DESTINATION_FILENAME;
+      this.projectFilename = DEFAULT_PROJECT_FILENAME;
+      this.aspectRatio = 0;
+      this.refreshParts();
     },
     openProject: function() {
       var that = this;

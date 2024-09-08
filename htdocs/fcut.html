@@ -23,6 +23,7 @@
         <div class="bar-flex-row">
           <button v-on:click="openProject().then(function() { pages.navigateTo('preview'); })" title="Select FCut Project file to open"><i class="fas fa-file"></i></button>
           <button v-on:click="saveProject()" title="Select FCut Project file to save as"><i class="fas fa-save"></i></button>
+          <button v-if="parts.length > 0" v-on:click="closeProject()" title="Close FCut Project"><i class="fas fa-trash"></i></button>
           <span class="bar-flex-row-content"></span>
           <button v-on:click="pages.navigateTo('help')"><i class="fas fa-question"></i></button>
         </div>
@@ -245,6 +246,19 @@
           <div class="input-bar">
             <label><input type="checkbox" v-model="exportMapAllStreams" /> Map all streams</label>
           </div>
+          <div class="input-bar">
+            <label><input type="checkbox" v-model="exportUseOptions" /> Use additional options</label>
+          </div>
+          <template v-if="exportUseOptions">
+            <div class="bar-flex-row">
+              <label>Source:</label>
+              <input v-model="exportSourceOptions" name="exportSourceOptions" type="text" class="bar-flex-row-content"></input>
+            </div>
+            <div class="bar-flex-row">
+              <label>Destination:</label>
+              <input v-model="exportOptions" name="exportOptions" type="text" class="bar-flex-row-content"></input>
+            </div>
+          </template>
           <!--
             <div class="input-bar">
               <label>Subtitles:</label>

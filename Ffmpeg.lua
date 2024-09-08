@@ -117,7 +117,7 @@ return class.create(function(ffmpeg)
     return args
   end
 
-  function ffmpeg:createCommand(part, filename, options, parameters)
+  function ffmpeg:createCommand(part, filename, options, sourceOptions, parameters)
     --[[
       '-ss position (input/output)'
       When used as an input option (before -i), seeks in this input file to position.
@@ -138,7 +138,7 @@ return class.create(function(ffmpeg)
     ]]
     local srcOptions = {}
     local destOptions = {}
-    if part.from ~= nil then
+    if part.from ~= nil and part.from >= 0 then
       local delay = (parameters and parameters.seekDelay) or self.seekDelayMs or 0
       if (delay >= 0) and (delay < part.from) then
         List.concat(srcOptions, '-ss', formatTime(part.from - delay))
@@ -149,8 +149,8 @@ return class.create(function(ffmpeg)
         List.concat(destOptions, '-ss', formatTime(part.from))
       end
     end
-    if part.to ~= nil then
-      if part.from ~= nil then
+    if part.to ~= nil and part.to >= 0 then
+      if part.from ~= nil and part.to > part.from then
         List.concat(destOptions, '-t', formatTime(part.to - part.from))
         --List.concat(destOptions, '-to', formatTime(part.to))
       else
@@ -158,6 +158,7 @@ return class.create(function(ffmpeg)
       end
     end
     List.concat(destOptions, options)
+    List.concat(srcOptions, sourceOptions)
     local sourceFile = self.sources[part.sourceId]
     return self:computeArguments(filename, destOptions, sourceFile:getPath(), srcOptions)
   end
@@ -175,21 +176,23 @@ return class.create(function(ffmpeg)
     end
   end
 
-  function ffmpeg:createCommands(destFilename, parts, destOptions, parameters)
+  function ffmpeg:createCommands(destFilename, parts, options, sourceOptions, parameters)
     local commands = {}
     local filename = destFilename
     if parameters.subtitles then
       filename = self:createTempFile('full.tmp'):getPath()
     end
-    if #parts == 1 then
-      table.insert(commands, self:createCommand(parts[1], filename, destOptions, parameters))
+    if #parts == 0 then
+      table.insert(commands, self:createCommand({}, filename, options, sourceOptions, parameters))
+    elseif #parts == 1 then
+      table.insert(commands, self:createCommand(parts[1], filename, options, sourceOptions, parameters))
     elseif #parts > 1 then
       local concatScript = StringBuffer:new()
       concatScript:append('# fcut')
       for i, part in ipairs(parts) do
         local partName = 'part_'..tostring(i)..'.tmp'
         local outFilename = self:createTempFile(partName):getPath()
-        table.insert(commands, self:createCommand(part, outFilename, destOptions, parameters))
+        table.insert(commands, self:createCommand(part, outFilename, options, sourceOptions, parameters))
         local concatPartname = string.gsub(outFilename, '[\\+]', '/')
         --local concatPartname = partName -- to be safe
         concatScript:append('\nfile ', concatPartname)

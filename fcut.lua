@@ -353,7 +353,7 @@ local httpContexts = {
       return false
     end,
     ['export(requestJson)?method=POST&:Content-Type=application/json'] = function(exchange, parameters)
-      local commands = ffmpeg:createCommands(parameters.filename, parameters.parts, parameters.options or {}, parameters.parameters or {})
+      local commands = ffmpeg:createCommands(parameters.filename, parameters.parts, parameters.options or {}, parameters.sourceOptions or {}, parameters.parameters or {})
       local exportId = strings.formatInteger(system.currentTimeMillis(), 64)
       logger:info('export '..exportId..' '..tostring(#commands)..' command(s)')
       exportContexts[exportId] = {
