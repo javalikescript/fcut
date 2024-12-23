@@ -8,6 +8,7 @@ var endRegExp = /^\n -- exit code (\d+)\s/;
 
 var DEFAULT_DESTINATION_FILENAME = 'fcut-out.mp4';
 var DEFAULT_PROJECT_FILENAME = 'fcut-project.json';
+var MAX_LOG_SIZE = 100000;
 
 var EXPORTED_FIELDS = ['destinationFilename', 'projectFilename', 'aspectRatio', 'exportFormat', 'exportVideoCodec', 'exportAudioCodec', 'exportSubtitleCodec', 'exportMapAllStreams', 'time'];
 
@@ -61,6 +62,8 @@ var vm = new Vue({
     time: 0,
     logBuffer: '',
     logLine: '',
+    logEnabled: true,
+    logRecvTime: 0,
     logTime: 0,
     logPartIndex: 0,
     logPartCount: 0,
@@ -387,6 +390,9 @@ var vm = new Vue({
         body: this.exportId
       });
     },
+    clearConsole: function() {
+      this.logBuffer = '';
+    },
     logMessage: function(content) {
       if (this.logCR) {
         this.logLine = '';
@@ -417,7 +423,18 @@ var vm = new Vue({
       }
       var index = content.lastIndexOf('\n');
       if (index >= 0) {
-        this.logBuffer += '\n' + this.logLine + content.substring(0, index);
+        if (this.logEnabled || found) {
+          if (this.logBuffer.length > MAX_LOG_SIZE) {
+            var logRecvTime = Date.now();
+            this.logBuffer = '...' + this.logBuffer.substring(MAX_LOG_SIZE * 9 / 10);
+            if (this.logEnabled && this.logRecvTime > 0 && (logRecvTime - this.logRecvTime) < 1000) {
+              this.logEnabled = false;
+              this.logBuffer += '\n -- Console disabled, too much data rate ------';
+            }
+            this.logRecvTime = logRecvTime;
+          }
+          this.logBuffer += '\n' + this.logLine + content.substring(0, index);
+        }
         this.logLine = content.substring(index + 1);
       } else {
         index = content.lastIndexOf('\r');

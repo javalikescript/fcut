@@ -281,6 +281,9 @@
     <page name="console">
       <div class="bar-flex-row">
         <button v-on:click="pages.navigateBack()"><i class="fas fa-arrow-left"></i></button>
+        <span class="bar-flex-row-content"></span>
+        <button v-on:click="clearConsole()" title="Clear console"><i class="fas fa-trash"></i></button>
+        <button v-on:click="logEnabled = !logEnabled" title="Disable console"><i :class="['fas', logEnabled ? 'fa-pause' : 'fa-play']"></i></button>
       </div>
       <div class="console">
         <pre>{{ logBuffer }}</pre>

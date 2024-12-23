@@ -9,7 +9,6 @@ local ProcessBuilder = require('jls.lang.ProcessBuilder')
 local Pipe = require('jls.io.Pipe')
 local File = require('jls.io.File')
 local FileDescriptor = require('jls.io.FileDescriptor')
-local tables = require('jls.util.tables')
 local strings = require('jls.util.strings')
 local Map = require('jls.util.Map')
 local List = require('jls.util.List')
@@ -94,7 +93,7 @@ local config = system.createArgumentTable({
     p = 'project',
     s = 'source',
   },
-});
+})
 
 -- Apply configured log level
 logger:setLevel(config.loglevel)
