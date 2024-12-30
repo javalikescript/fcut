@@ -306,6 +306,7 @@
     <page name="help">
       <div class="padded">
         <button v-on:click="pages.navigateBack()"><i class="fas fa-arrow-left"></i></button>
+        <button v-on:click="clearCache()" title="Clear cache"><i class="fas fa-trash"></i></button>
         <h2>Help</h2>
         <p>Fast Cut allows to visually cut and join videos then export them losslessly.</p>
         <p>The binary search helps you to find a cut time quickly,

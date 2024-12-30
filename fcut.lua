@@ -63,7 +63,7 @@ local function startProcess(command, outputFile, callback)
     pb:redirectOutput(fd)
   end
   if logger:isLoggable(logger.FINE) then
-    logger:fine('Start process: '..table.concat(command, ' '))
+    logger:fine('Start process: %s', table.concat(command, ' '))
   end
   local ph = pb:start()
   ph:ended():next(function(exitCode)
@@ -129,7 +129,7 @@ if not cacheDir:isDirectory() then
     error('Cannot create cache directory, '..cacheDir:getPath())
   end
 end
-logger:info('Cache directory is '..cacheDir:getPath())
+logger:info('Cache directory is "%s"', cacheDir)
 
 local ffmpeg = Ffmpeg:new(cacheDir)
 ffmpeg:configure(config.ffmpeg)
@@ -140,18 +140,18 @@ local function loadExtensions(...)
   if not extensionsDir:isDirectory() then
     return
   end
-  logger:info('Loading extensions from directory "'..extensionsDir:getPath()..'"')
+  logger:info('Loading extensions from directory "%s"', extensionsDir)
   for _, extensionDir in ipairs(extensionsDir:listFiles()) do
     local extensionLuaFile = File:new(extensionDir, 'init.lua')
     if extensionDir:isDirectory() and extensionLuaFile:isFile() then
       local scriptFn, err = loadfile(extensionLuaFile:getPath())
       if not scriptFn or err then
-        logger:warn('Cannot load extension from script "'..extensionLuaFile:getPath()..'" due to '..tostring(err))
+        logger:warn('Cannot load extension from script "%s" due to %s', extensionLuaFile, err)
       else
         local status
         status, err = pcall(scriptFn, ...)
         if not status then
-          logger:warn('Cannot load extension from script "'..extensionLuaFile:getPath()..'" due to '..tostring(err))
+          logger:warn('Cannot load extension from script "%s" due to %s', extensionLuaFile, err)
         end
       end
     end
@@ -354,11 +354,32 @@ local httpContexts = {
     ['export(requestJson)?method=POST&:Content-Type=application/json'] = function(exchange, parameters)
       local commands = ffmpeg:createCommands(parameters.filename, parameters.parts, parameters.options or {}, parameters.sourceOptions or {}, parameters.parameters or {})
       local exportId = strings.formatInteger(system.currentTimeMillis(), 64)
-      logger:info('export '..exportId..' '..tostring(#commands)..' command(s)')
+      logger:info('export %s %s command(s)', exportId, #commands)
       exportContexts[exportId] = {
         commands = commands,
       }
       return exportId
+    end,
+    getCacheInfo = function(exchange)
+      local size = 0
+      local count = 0
+      cacheDir:forEachFile(function(_, file)
+        logger:fine('file "%s" size %d', file, file:length())
+        size = size + file:length()
+        count = count + 1
+      end, true)
+      return {
+        dir = cacheDir:getPath(),
+        count = count,
+        size = size
+      }
+    end,
+    ['clearCache?method=POST'] = function(exchange)
+      local success = cacheDir:deleteAll()
+      return {
+        status = success,
+        reason = success and 'done' or 'partial'
+      }
     end,
   }),
   -- Context that handle the export commands and output to a WebSocket
@@ -401,7 +422,7 @@ if config.webview.disable then
     }))
     loadExtensions(httpServer)
   end, function(err)
-    logger:warn('Cannot bind HTTP server due to '..tostring(err))
+    logger:warn('Cannot bind HTTP server due to %s', err)
     os.exit(1)
   end)
 else
@@ -466,7 +487,7 @@ else
   end):next(function()
     logger:info('WebView closed')
   end, function(reason)
-    logger:warn('Cannot open webview due to '..tostring(reason))
+    logger:warn('Cannot open webview due to %s', reason)
   end):finally(function()
     terminate()
   end)

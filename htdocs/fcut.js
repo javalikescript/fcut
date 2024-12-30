@@ -86,6 +86,18 @@ var vm = new Vue({
       this.messageTitle = title || 'Message';
       return showMessage();
     },
+    clearCache: function() {
+      var that = this;
+      return fetch('rest/getCacheInfo').then(getJson).then(function(info) {
+        return that.showMessage('Location: ' + info.dir + '\n' + info.count + ' files ' + info.size + ' bytes\nDo you want to clear the cache?');
+      }).then(function() {
+        return fetch('rest/clearCache', {method: 'POST'});
+      }).then(getJson).then(function(info) {
+        if (!info.status) {
+          console.warn('clearCache ' + info.reason);
+        }
+      });
+    },
     selectFiles: function(multiple, save, extention, filename) {
       var path = this.keepFileChooserPath ? undefined : this.config.media;
       var name = undefined;
